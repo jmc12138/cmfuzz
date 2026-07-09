@@ -59,6 +59,24 @@ static int x25519(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     return 0;
 }
 
+/* ECDSA-P256 verify-interop (op13): import the SEC1 uncompressed public point,
+ * verify the DER signature (Signature_Format::DerSequence) over SHA-256 of the
+ * message; reply 1-byte accept/reject. */
+static int ecdsa_verify(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    const uint8_t *pub, *sig, *msg; size_t publen, siglen, mlen;
+    int verdict = 0;
+    if (cmf_verify_parse(v->msg, v->msglen, &pub, &publen, &sig, &siglen, &msg, &mlen) == 0) {
+        try {
+            Botan::EC_Group group = Botan::EC_Group::from_name("secp256r1");
+            Botan::EC_AffinePoint point(group, std::span<const uint8_t>(pub, publen));
+            Botan::ECDSA_PublicKey key(group, point);
+            Botan::PK_Verifier ver(key, "SHA-256", Botan::Signature_Format::DerSequence);
+            verdict = ver.verify_message(msg, mlen, sig, siglen) ? 1 : 0;
+        } catch (...) { verdict = 0; }
+    }
+    out[0] = (uint8_t)verdict; *n = 1; return 0;
+}
+
 static int digest(const char *name, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     auto h = Botan::HashFunction::create(name);
     if (!h) return -1;
@@ -115,6 +133,7 @@ int main(void) {
                     case 10: rc = pbkdf2(&v, out, &n); break;
                     case 11: rc = ed25519(&v, out, &n); break;
                     case 12: rc = x25519(&v, out, &n); break;
+                    case 13: rc = ecdsa_verify(&v, out, &n); break;
                 }
             } catch (...) { rc = -1; }
             free(v.blob);

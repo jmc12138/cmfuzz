@@ -22,6 +22,7 @@
 #include <openssl/hmac.h>
 #include <openssl/kdf.h>
 #include <openssl/core_names.h>
+#include <openssl/ec.h>
 #include "compute_common.h"
 
 /* -------- deterministic PRNG (splitmix64) for reproducible vectors -------- */
@@ -120,6 +121,44 @@ static int ref_x25519(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     if (!ok) return -1;
     *n = sl; return 0;
 }
+/* ECDSA-P256 verify-interop (op13): OpenSSL is both the signer (reference) and
+ * the verdict authority. One P-256 key is reused for the whole run (only the
+ * message and the tamper decision vary). Produces the verify-payload
+ * (pubkeylen||pub||siglen||sig||message) and the accept/reject verdict OpenSSL
+ * assigns to it, which every backend must reproduce. */
+static EVP_PKEY *g_ecdsa_key = NULL;
+static int ecdsa_make_payload(uint8_t *pl, size_t *plen, int *verdict) {
+    if (!g_ecdsa_key) g_ecdsa_key = EVP_EC_gen("P-256");
+    if (!g_ecdsa_key) return -1;
+    size_t mlen = 1 + (rnd() % 200);
+    uint8_t msg[256];
+    for (size_t i = 0; i < mlen; i++) msg[i] = (uint8_t)(rnd() & 0xFF);
+    uint8_t sig[160]; size_t siglen = sizeof sig;
+    EVP_MD_CTX *sc = EVP_MD_CTX_new();
+    int signed_ok = sc &&
+        EVP_DigestSignInit(sc, NULL, EVP_sha256(), NULL, g_ecdsa_key) == 1 &&
+        EVP_DigestSign(sc, sig, &siglen, msg, mlen) == 1;
+    EVP_MD_CTX_free(sc);
+    if (!signed_ok) return -1;
+    if (rnd() & 1) msg[rnd() % mlen] ^= 0x01;   /* tamper -> signature no longer valid */
+    EVP_MD_CTX *vc = EVP_MD_CTX_new();
+    *verdict = (vc &&
+        EVP_DigestVerifyInit(vc, NULL, EVP_sha256(), NULL, g_ecdsa_key) == 1 &&
+        EVP_DigestVerify(vc, sig, siglen, msg, mlen) == 1) ? 1 : 0;
+    EVP_MD_CTX_free(vc);
+    uint8_t *pub = NULL;
+    size_t publen = EVP_PKEY_get1_encoded_public_key(g_ecdsa_key, &pub);
+    if (!pub || publen == 0) return -1;
+    size_t off = 0;
+    pl[off++] = (uint8_t)(publen >> 8); pl[off++] = (uint8_t)(publen & 0xFF);
+    memcpy(pl + off, pub, publen); off += publen;
+    pl[off++] = (uint8_t)(siglen >> 8); pl[off++] = (uint8_t)(siglen & 0xFF);
+    memcpy(pl + off, sig, siglen); off += siglen;
+    memcpy(pl + off, msg, mlen); off += mlen;
+    OPENSSL_free(pub);
+    *plen = off; return 0;
+}
+
 static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     switch (v->op) {
         case 0: return ref_digest(EVP_sha256(), v, o, n);
@@ -139,7 +178,7 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     return -1;
 }
 
-#define CMF_NUM_OPS 13   /* ops 0..12 (see compute_common.h) */
+#define CMF_NUM_OPS 14   /* ops 0..13 (see compute_common.h) */
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
@@ -166,6 +205,28 @@ int main(int argc, char **argv) {
 
     for (long i = 0; i < N; i++) {
         int op = (int)(rnd() % CMF_NUM_OPS);
+
+        /* Verify-interop ops carry a packed (pub||sig||msg) payload in the msg
+         * region and compare only the 1-byte accept/reject verdict. */
+        if (op == 13) {
+            uint8_t payload[1024]; size_t plen = 0; int verdict = 0;
+            if (ecdsa_make_payload(payload, &plen, &verdict) != 0) {
+                /* still emit a well-formed (empty-payload) request so the line
+                 * count stays in lockstep; every backend will reply reject. */
+                plen = 0; verdict = 0;
+            }
+            size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + plen;
+            uint8_t *blob = malloc(need);
+            memset(blob, 0, CMF_KEYLEN + CMF_NONCELEN + 2);   /* key/nonce/aadlen=0 */
+            memcpy(blob + CMF_KEYLEN + CMF_NONCELEN + 2, payload, plen);
+            fprintf(rf, "%d ", op);
+            for (size_t j = 0; j < need; j++) fprintf(rf, "%c%c", HEX[blob[j]>>4], HEX[blob[j]&15]);
+            fputc('\n', rf);
+            strcpy(refhex[i], verdict ? "01" : "00");
+            free(blob);
+            continue;
+        }
+
         size_t msglen = rnd() % 512;
         if (op == 12) msglen = CMF_X25519_LEN;   /* X25519 peer public key */
         size_t aadlen = (op == 3 || op == 4 || op == 9) ? (rnd() % 64) : 0;

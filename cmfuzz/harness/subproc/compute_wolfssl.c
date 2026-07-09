@@ -21,7 +21,28 @@
 #include <wolfssl/wolfcrypt/ed25519.h>
 #include <wolfssl/wolfcrypt/curve25519.h>
 #include <wolfssl/wolfcrypt/random.h>
+#include <wolfssl/wolfcrypt/ecc.h>
 #include "compute_common.h"
+
+/* ECDSA-P256 verify-interop (op13): import the SEC1 uncompressed public point
+ * (wc_ecc_import_x963 infers SECP256R1 from the 65-byte length), verify the DER
+ * signature over SHA-256(message); reply 1-byte accept/reject. */
+static int ecdsa_verify(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    const uint8_t *pub, *sig, *msg; size_t publen, siglen, mlen;
+    int verdict = 0;
+    if (cmf_verify_parse(v->msg, v->msglen, &pub, &publen, &sig, &siglen, &msg, &mlen) == 0) {
+        uint8_t d[WC_SHA256_DIGEST_SIZE];
+        ecc_key key;
+        if (wc_Sha256Hash(msg, (word32)mlen, d) == 0 && wc_ecc_init(&key) == 0) {
+            int stat = 0;
+            if (wc_ecc_import_x963(pub, (word32)publen, &key) == 0 &&
+                wc_ecc_verify_hash(sig, (word32)siglen, d, sizeof d, &stat, &key) == 0)
+                verdict = stat ? 1 : 0;
+            wc_ecc_free(&key);
+        }
+    }
+    out[0] = (uint8_t)verdict; *n = 1; return 0;
+}
 
 static int ed25519_sign(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     ed25519_key k;
@@ -172,6 +193,7 @@ int main(void) {
                 case 10: rc = pbkdf2(&v, out, &n); break;
                 case 11: rc = ed25519_sign(&v, out, &n); break;
                 case 12: rc = x25519_ss(&v, out, &n); break;
+                case 13: rc = ecdsa_verify(&v, out, &n); break;
             }
             free(v.blob);
         }

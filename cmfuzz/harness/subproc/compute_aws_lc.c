@@ -14,7 +14,31 @@
 #include <openssl/aead.h>
 #include <openssl/hkdf.h>
 #include <openssl/curve25519.h>
+#include <openssl/ec.h>
+#include <openssl/ecdsa.h>
+#include <openssl/sha.h>
+#include <openssl/nid.h>
 #include "compute_common.h"
+
+/* ECDSA-P256 verify-interop (op13): import the SEC1 uncompressed public point,
+ * verify the DER signature over SHA-256(message); reply 1-byte accept/reject. */
+static int ecdsa_verify(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    const uint8_t *pub, *sig, *msg; size_t publen, siglen, mlen;
+    int verdict = 0;
+    if (cmf_verify_parse(v->msg, v->msglen, &pub, &publen, &sig, &siglen, &msg, &mlen) == 0) {
+        uint8_t d[32]; SHA256(msg, mlen, d);
+        EC_KEY *k = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+        if (k) {
+            const EC_GROUP *g = EC_KEY_get0_group(k);
+            EC_POINT *pt = EC_POINT_new(g);
+            if (pt && EC_POINT_oct2point(g, pt, pub, publen, NULL) == 1 &&
+                EC_KEY_set_public_key(k, pt) == 1)
+                verdict = ECDSA_verify(0, d, sizeof d, sig, siglen, k) == 1 ? 1 : 0;
+            EC_POINT_free(pt); EC_KEY_free(k);
+        }
+    }
+    out[0] = (uint8_t)verdict; *n = 1; return 0;
+}
 
 static int ed25519(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     uint8_t pub[32], priv[64];
@@ -96,6 +120,7 @@ int main(void) {
                 case 10: rc = pbkdf2(&v, out, &n); break;
                 case 11: rc = ed25519(&v, out, &n); break;
                 case 12: rc = x25519(&v, out, &n); break;
+                case 13: rc = ecdsa_verify(&v, out, &n); break;
             }
             free(v.blob);
         }

@@ -24,6 +24,18 @@
  *                               deterministic per RFC 8032, so byte-exact)
  *             12 X25519        (scalar=key, peer public=msg[0..32] -> 32-byte
  *                               shared secret; deterministic per RFC 7748)
+ *             13 ECDSA-P256 verify (verify-interop oracle: the reference/OpenSSL
+ *                               generates a P-256 key + ECDSA-SHA256 signature,
+ *                               sometimes tampered; each backend replies with a
+ *                               1-byte verdict 01=accept / 00=reject, and all
+ *                               backends must agree on the verdict. The msg
+ *                               region carries a verify-payload, see below.)
+ *
+ * Verify-payload (ops >= 13, packed inside the msg region):
+ *     pubkeylen(2, BE) || pubkey || siglen(2, BE) || sig || message
+ *   Randomised schemes (ECDSA k) don't break the differential because only the
+ *   accept/reject verdict is compared, not signature bytes. This also exercises
+ *   cross-library key/signature encoding parsing (SEC1 point, ASN.1 DER).
  *
  * Unused fields are ignored per op (hashes ignore key/nonce/aad; HMAC uses key
  * + msg; AEAD uses everything). Fixing the layout keeps one parser on both
@@ -49,6 +61,24 @@
 /* Public-key differential parameters (ops 11/12) — deterministic primitives. */
 #define CMF_ED25519_SIGLEN 64
 #define CMF_X25519_LEN     32
+
+/* Verify-interop ops (>= 13): parse the packed verify-payload out of the msg
+ * region into (public key, signature, message) views. Returns 0 on success. */
+static inline int cmf_verify_parse(const uint8_t *p, size_t plen,
+                                   const uint8_t **pub, size_t *publen,
+                                   const uint8_t **sig, size_t *siglen,
+                                   const uint8_t **msg, size_t *msglen) {
+    size_t off = 0;
+    if (plen < 2) return -1;
+    size_t pl = ((size_t)p[0] << 8) | p[1]; off = 2;
+    if (off + pl + 2 > plen) return -1;
+    *pub = p + off; *publen = pl; off += pl;
+    size_t sl = ((size_t)p[off] << 8) | p[off + 1]; off += 2;
+    if (off + sl > plen) return -1;
+    *sig = p + off; *siglen = sl; off += sl;
+    *msg = p + off; *msglen = plen - off;
+    return 0;
+}
 
 typedef struct {
     int      op;
