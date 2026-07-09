@@ -96,6 +96,30 @@ static int ref_pbkdf2(const cmf_vec_t *v, uint8_t *o, size_t *n) {
                            EVP_sha256(), CMF_PBKDF2_DKLEN, o)) return -1;
     *n = CMF_PBKDF2_DKLEN; return 0;
 }
+static int ref_ed25519(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    EVP_PKEY *pk = EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, NULL, v->key, CMF_KEYLEN);
+    if (!pk) return -1;
+    EVP_MD_CTX *c = EVP_MD_CTX_new();
+    size_t sl = CMF_ED25519_SIGLEN;
+    int ok = c && EVP_DigestSignInit(c, NULL, NULL, NULL, pk) == 1 &&
+             EVP_DigestSign(c, o, &sl, v->msg, v->msglen) == 1;
+    EVP_MD_CTX_free(c); EVP_PKEY_free(pk);
+    if (!ok) return -1;
+    *n = sl; return 0;
+}
+static int ref_x25519(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    EVP_PKEY *priv = EVP_PKEY_new_raw_private_key(EVP_PKEY_X25519, NULL, v->key, CMF_KEYLEN);
+    EVP_PKEY *peer = EVP_PKEY_new_raw_public_key(EVP_PKEY_X25519, NULL, v->msg, CMF_X25519_LEN);
+    EVP_PKEY_CTX *ctx = priv ? EVP_PKEY_CTX_new(priv, NULL) : NULL;
+    size_t sl = CMF_X25519_LEN;
+    int ok = priv && peer && ctx &&
+             EVP_PKEY_derive_init(ctx) == 1 &&
+             EVP_PKEY_derive_set_peer(ctx, peer) == 1 &&
+             EVP_PKEY_derive(ctx, o, &sl) == 1;
+    EVP_PKEY_CTX_free(ctx); EVP_PKEY_free(peer); EVP_PKEY_free(priv);
+    if (!ok) return -1;
+    *n = sl; return 0;
+}
 static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     switch (v->op) {
         case 0: return ref_digest(EVP_sha256(), v, o, n);
@@ -109,11 +133,13 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
         case 8: return ref_xof(EVP_shake256(), v, o, 64, n);
         case 9: return ref_hkdf(v, o, n);
         case 10: return ref_pbkdf2(v, o, n);
+        case 11: return ref_ed25519(v, o, n);
+        case 12: return ref_x25519(v, o, n);
     }
     return -1;
 }
 
-#define CMF_NUM_OPS 11   /* ops 0..10 (see compute_common.h) */
+#define CMF_NUM_OPS 13   /* ops 0..12 (see compute_common.h) */
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
@@ -141,6 +167,7 @@ int main(int argc, char **argv) {
     for (long i = 0; i < N; i++) {
         int op = (int)(rnd() % CMF_NUM_OPS);
         size_t msglen = rnd() % 512;
+        if (op == 12) msglen = CMF_X25519_LEN;   /* X25519 peer public key */
         size_t aadlen = (op == 3 || op == 4 || op == 9) ? (rnd() % 64) : 0;
         size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + aadlen + msglen;
         uint8_t *blob = malloc(need);
@@ -148,6 +175,11 @@ int main(int argc, char **argv) {
         blob[CMF_KEYLEN + CMF_NONCELEN]     = (uint8_t)(aadlen >> 8);
         blob[CMF_KEYLEN + CMF_NONCELEN + 1] = (uint8_t)(aadlen & 0xFF);
         rnd_bytes(blob + CMF_KEYLEN + CMF_NONCELEN + 2, aadlen + msglen);
+        /* X25519: clear bit 255 of the peer u-coordinate so it is in RFC 7748
+         * canonical form. OpenSSL/BoringSSL/Botan mask this bit internally, but
+         * wolfCrypt rejects a non-canonical peer key outright; masking here keeps
+         * the differential well-defined over the actual scalar multiplication. */
+        if (op == 12) blob[need - 1] &= 0x7F;
 
         /* request line: "<op> <hex-of-blob>\n" */
         fprintf(rf, "%d ", op);

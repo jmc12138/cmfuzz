@@ -20,6 +20,10 @@
  *             7 SHAKE128 (32-byte squeeze)  8 SHAKE256 (64-byte squeeze)
  *             9  HKDF-SHA256   (IKM=msg, salt=key, info=aad, 42-byte output)
  *             10 PBKDF2-HMAC-SHA256 (password=msg, salt=key, 4096 iters, 32B)
+ *             11 Ed25519 sign  (seed=key, message=msg -> 64-byte signature;
+ *                               deterministic per RFC 8032, so byte-exact)
+ *             12 X25519        (scalar=key, peer public=msg[0..32] -> 32-byte
+ *                               shared secret; deterministic per RFC 7748)
  *
  * Unused fields are ignored per op (hashes ignore key/nonce/aad; HMAC uses key
  * + msg; AEAD uses everything). Fixing the layout keeps one parser on both
@@ -41,6 +45,10 @@
 #define CMF_HKDF_OUTLEN   42
 #define CMF_PBKDF2_ITER   4096
 #define CMF_PBKDF2_DKLEN  32
+
+/* Public-key differential parameters (ops 11/12) — deterministic primitives. */
+#define CMF_ED25519_SIGLEN 64
+#define CMF_X25519_LEN     32
 
 typedef struct {
     int      op;

@@ -40,6 +40,25 @@ static int pbkdf2(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     return 0;
 }
 
+static int ed25519(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    auto sk = Botan::Ed25519_PrivateKey::from_seed(
+        std::span<const uint8_t>(v->key, CMF_KEYLEN));
+    Botan::Null_RNG rng;   /* pure Ed25519 is deterministic — RNG unused */
+    Botan::PK_Signer signer(sk, rng, "");
+    std::vector<uint8_t> sig = signer.sign_message(v->msg, v->msglen, rng);
+    memcpy(out, sig.data(), sig.size());
+    *n = sig.size();
+    return 0;
+}
+
+static int x25519(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    Botan::X25519_PrivateKey sk(std::span<const uint8_t>(v->key, CMF_KEYLEN));
+    Botan::secure_vector<uint8_t> ss = sk.agree(v->msg, CMF_X25519_LEN);
+    memcpy(out, ss.data(), ss.size());
+    *n = ss.size();
+    return 0;
+}
+
 static int digest(const char *name, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     auto h = Botan::HashFunction::create(name);
     if (!h) return -1;
@@ -94,6 +113,8 @@ int main(void) {
                     case 8: rc = digest("SHAKE-256(512)", &v, out, &n); break;
                     case 9:  rc = hkdf(&v, out, &n); break;
                     case 10: rc = pbkdf2(&v, out, &n); break;
+                    case 11: rc = ed25519(&v, out, &n); break;
+                    case 12: rc = x25519(&v, out, &n); break;
                 }
             } catch (...) { rc = -1; }
             free(v.blob);

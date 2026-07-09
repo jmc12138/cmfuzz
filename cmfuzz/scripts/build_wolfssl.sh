@@ -17,7 +17,8 @@ if [ -z "$LIB" ]; then
   ( cd "$WOLF" && ./autogen.sh >/tmp/wolf_autogen.log 2>&1 \
     && ./configure --enable-static --disable-shared \
          --enable-aesgcm --enable-chacha --enable-poly1305 \
-         --enable-sha512 --enable-hmac >/tmp/wolf_conf.log 2>&1 \
+         --enable-sha512 --enable-sha3 --enable-hmac --enable-hkdf --enable-pwdbased \
+         --enable-curve25519 --enable-ed25519 >/tmp/wolf_conf.log 2>&1 \
     && make -j"$(nproc)" >/tmp/wolf_make.log 2>&1 )
 fi
 find "$WOLF/src/.libs" -name libwolfssl.a 2>/dev/null | head -1

@@ -18,7 +18,51 @@
 #include <wolfssl/wolfcrypt/aes.h>
 #include <wolfssl/wolfcrypt/sha3.h>
 #include <wolfssl/wolfcrypt/pwdbased.h>
+#include <wolfssl/wolfcrypt/ed25519.h>
+#include <wolfssl/wolfcrypt/curve25519.h>
+#include <wolfssl/wolfcrypt/random.h>
 #include "compute_common.h"
+
+static int ed25519_sign(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    ed25519_key k;
+    if (wc_ed25519_init(&k) != 0) return -1;
+    uint8_t pub[ED25519_PUB_KEY_SIZE];
+    word32 sl = CMF_ED25519_SIGLEN;
+    int rc = -1;
+    /* make_public writes the public key to the buffer but does not store it
+     * inside the key object, so import it back before signing — otherwise the
+     * signer hashes an all-zero public key and produces a wrong S. */
+    if (wc_ed25519_import_private_only(v->key, CMF_KEYLEN, &k) == 0 &&
+        wc_ed25519_make_public(&k, pub, sizeof pub) == 0 &&
+        wc_ed25519_import_public(pub, sizeof pub, &k) == 0 &&
+        wc_ed25519_sign_msg(v->msg, (word32)v->msglen, out, &sl, &k) == 0) {
+        *n = sl; rc = 0;
+    }
+    wc_ed25519_free(&k);
+    return rc;
+}
+static int x25519_ss(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    curve25519_key priv, peer;
+    if (wc_curve25519_init(&priv) != 0) return -1;
+    if (wc_curve25519_init(&peer) != 0) { wc_curve25519_free(&priv); return -1; }
+    word32 sl = CMF_X25519_LEN;
+    int rc = -1;
+    /* This wolfSSL build enables curve25519 blinding, which requires an RNG on
+     * the private key; without it shared_secret returns BAD_FUNC_ARG. Blinding
+     * only randomizes intermediates — the shared secret is unchanged. */
+    WC_RNG rng;
+    if (wc_InitRng(&rng) != 0) { wc_curve25519_free(&peer); wc_curve25519_free(&priv); return -1; }
+    if (wc_curve25519_import_private_ex(v->key, CMF_KEYLEN, &priv, EC25519_LITTLE_ENDIAN) == 0 &&
+        wc_curve25519_import_public_ex(v->msg, CMF_X25519_LEN, &peer, EC25519_LITTLE_ENDIAN) == 0 &&
+        wc_curve25519_set_rng(&priv, &rng) == 0 &&
+        wc_curve25519_shared_secret_ex(&priv, &peer, out, &sl, EC25519_LITTLE_ENDIAN) == 0) {
+        *n = sl; rc = 0;
+    }
+    wc_FreeRng(&rng);
+    wc_curve25519_free(&peer);
+    wc_curve25519_free(&priv);
+    return rc;
+}
 
 static int hkdf(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     if (wc_HKDF(WC_SHA256, v->msg, (word32)v->msglen, v->key, CMF_KEYLEN,
@@ -126,6 +170,8 @@ int main(void) {
                 case 8: rc = shake256(&v, out, &n); break;
                 case 9:  rc = hkdf(&v, out, &n); break;
                 case 10: rc = pbkdf2(&v, out, &n); break;
+                case 11: rc = ed25519_sign(&v, out, &n); break;
+                case 12: rc = x25519_ss(&v, out, &n); break;
             }
             free(v.blob);
         }

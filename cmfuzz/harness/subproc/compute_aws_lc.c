@@ -13,7 +13,19 @@
 #include <openssl/hmac.h>
 #include <openssl/aead.h>
 #include <openssl/hkdf.h>
+#include <openssl/curve25519.h>
 #include "compute_common.h"
+
+static int ed25519(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    uint8_t pub[32], priv[64];
+    ED25519_keypair_from_seed(pub, priv, v->key);
+    if (!ED25519_sign(out, v->msg, v->msglen, priv)) return -1;
+    *n = CMF_ED25519_SIGLEN; return 0;
+}
+static int x25519(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (!X25519(out, v->key, v->msg)) return -1;
+    *n = CMF_X25519_LEN; return 0;
+}
 
 static int hkdf(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     if (!HKDF(out, CMF_HKDF_OUTLEN, EVP_sha256(), v->msg, v->msglen,
@@ -82,6 +94,8 @@ int main(void) {
                 case 8: rc = xof(EVP_shake256(), &v, out, 64, &n); break;
                 case 9:  rc = hkdf(&v, out, &n); break;
                 case 10: rc = pbkdf2(&v, out, &n); break;
+                case 11: rc = ed25519(&v, out, &n); break;
+                case 12: rc = x25519(&v, out, &n); break;
             }
             free(v.blob);
         }
