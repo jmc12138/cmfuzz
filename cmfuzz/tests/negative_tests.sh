@@ -290,7 +290,9 @@ else
 fi
 if [ -f /usr/include/nettle/sha2.h ]; then
   echo "[neg] building fault-injected nettle backend..."
-  NET_LIBS="$(pkg-config --libs hogweed 2>/dev/null || echo '-lhogweed -lnettle -lgmp')"
+  # Append -lnettle: some distros' hogweed.pc omits it (nettle is a private
+  # requirement) yet compute_nettle.c references nettle_* symbols directly.
+  NET_LIBS="$(pkg-config --libs hogweed 2>/dev/null && echo -lnettle -lgmp || echo '-lhogweed -lnettle -lgmp')"
   cc -g -O1 -DCMF_DIFF_FAULT=1 "$ROOT/harness/subproc/compute_nettle.c" -I"$ROOT/harness/subproc" $NET_LIBS -o "$TMP/compute_nettle_fault"
   "$TMP/diff_subproc" 200 12345 nettle_fault="$TMP/compute_nettle_fault" > "$TMP/netout.txt" 2>&1 || true
   cat "$TMP/netout.txt" >&2
