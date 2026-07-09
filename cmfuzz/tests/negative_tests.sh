@@ -249,6 +249,35 @@ else
   echo "SKIP  Rust cross-language self-test (cargo not installed)"
 fi
 
+# Stage 2.5 FHE oracles self-test: OpenFHE<->SEAL BFV cross-library differential
+# (O1) + SEAL CKKS approximate-arithmetic error bound (O2). Only if both FHE
+# libraries are already built (OpenFHE is heavy; build_fhe_diff.sh builds it on
+# demand, but here we just compile the fault harnesses against the prebuilt libs).
+SEAL_A=$(ls "$ROOT/libs/SEAL/build/lib/"libseal-*.a 2>/dev/null | head -1 || true)
+OFHE_A="$ROOT/libs/openfhe/build/lib/libOPENFHEpke_static.a"
+if [ -n "$SEAL_A" ] && [ -f "$OFHE_A" ]; then
+  echo "[neg] building fault-injected FHE oracles (OpenFHE<->SEAL BFV + SEAL CKKS)..."
+  bash "$ROOT/scripts/build_fhe_diff.sh" fault >/dev/null 2>&1
+  "$ROOT/build/harness/fhe_diff_fault" 20 12345 > "$TMP/fhediff.txt" 2>&1 || true
+  cat "$TMP/fhediff.txt" >&2
+  if grep -q "oracle=O1_fhe_bfv_interop" "$TMP/fhediff.txt"; then
+    echo "PASS  FHE differential detects OpenFHE<->SEAL BFV divergence (O1_fhe_bfv_interop)"; pass=$((pass+1))
+  else
+    echo "FAIL  FHE differential (expected O1_fhe_bfv_interop)"; fail=$((fail+1))
+  fi
+  "$ROOT/build/harness/fhe_ckks_fault" 20 12345 > "$TMP/fheckks.txt" 2>&1 || true
+  cat "$TMP/fheckks.txt" >&2
+  if grep -q "oracle=O2_ckks_error_bound" "$TMP/fheckks.txt"; then
+    echo "PASS  CKKS error-bound oracle detects out-of-bound result (O2_ckks_error_bound)"; pass=$((pass+1))
+  else
+    echo "FAIL  CKKS error-bound oracle (expected O2_ckks_error_bound)"; fail=$((fail+1))
+  fi
+  # Rebuild clean (non-fault) FHE binaries so later steps don't reuse fault ones.
+  bash "$ROOT/scripts/build_fhe_diff.sh" >/dev/null 2>&1 || true
+else
+  echo "SKIP  FHE oracle self-tests (OpenFHE/SEAL not built; run scripts/build_openfhe.sh + build_seal.sh)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

@@ -13,12 +13,14 @@
 #
 # liboqs is cloned + built *inside* the image (it is gitignored and not shipped
 # in the repo). The optional differential libs (libsodium/mbedtls/crypto++),
-# Microsoft SEAL, and BoringSSL/aws-lc (stage-2.1 subprocess differential) are
-# NOT built here to keep the image small/fast; run scripts/build_diff_libs.sh,
-# scripts/build_seal.sh, or scripts/build_subproc.sh inside the container if you
-# need the differential (O1), FHE, or BoringSSL/aws-lc harnesses. Go 1.22 is
+# Microsoft SEAL + OpenFHE (stage-2.5 FHE differential), and BoringSSL/aws-lc
+# (stage-2.1 subprocess differential) are NOT built here to keep the image
+# small/fast; run scripts/build_diff_libs.sh, scripts/build_seal.sh +
+# scripts/build_openfhe.sh, or scripts/build_subproc.sh inside the container if
+# you need the differential (O1), FHE, or BoringSSL/aws-lc harnesses. Go 1.22 is
 # preinstalled under /usr/local/go so build_subproc.sh (which builds BoringSSL
-# and aws-lc — the latter needs Go >= 1.20) works on demand.
+# and aws-lc — the latter needs Go >= 1.20) works on demand. The FHE self-test
+# in negative_tests.sh SKIPs unless SEAL + OpenFHE have been built.
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive

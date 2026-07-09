@@ -63,4 +63,7 @@ bash "$ROOT/scripts/build_pqc_diff.sh" || echo "[build_all] PQC diff skipped (PQ
 bash "$ROOT/scripts/build_go_diff.sh" || echo "[build_all] Go cross-lang diff skipped (Go missing)"
 # Stage 2.4 cross-language differential (RustCrypto backend). Optional: needs cargo.
 bash "$ROOT/scripts/build_rust_diff.sh" || echo "[build_all] Rust cross-lang diff skipped (cargo missing)"
+# Stage 2.5 FHE oracles: OpenFHE<->SEAL BFV differential + SEAL CKKS error bound.
+# Optional: needs OpenFHE (built on demand by build_fhe_diff.sh).
+bash "$ROOT/scripts/build_fhe_diff.sh" || echo "[build_all] FHE diff skipped (OpenFHE/SEAL missing)"
 echo "[build_all] done"
