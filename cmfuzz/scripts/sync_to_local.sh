@@ -3,8 +3,8 @@
 # via the cpolar tunnel file-server REST API. Files land under <workspace>/cmfuzz/.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BASE="${CMF_TUNNEL:-http://401e9bcb.r8.cpolar.cn}"
-AUTH="${CMF_TUNNEL_AUTH:-Bearer fe1c009b3eccb2862a4b98e82f22be3f}"
+BASE="${CMF_TUNNEL:-http://2f2d28c7.r8.cpolar.cn}"
+AUTH="${CMF_TUNNEL_AUTH:-Bearer 40b4d425ddd4311dd74bdb8604ad1623}"
 DEST_PREFIX="cmfuzz"
 
 cd "$ROOT"

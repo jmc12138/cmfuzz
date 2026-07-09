@@ -75,6 +75,21 @@
 ### 2.4 全同态加密 —— SEAL
 靶：`build/harness/fhe_seal_bfv` ✅：BFV 同态加/乘正确性、分配律 `a*(b+c)==a*b+a*c`。
 
+### 2.5 L2 组合层 —— HPKE（KEM + KDF + AEAD）【新】
+把测试从单原语(L1)抬到**组合层(L2)**：按 HPKE 方式把 KEM→HKDF-SHA256→AES-256-GCM 串起来，
+手工组合（OpenSSL 3.0.2 无 OSSL_HPKE_* API），两种 KEM 后端：
+
+| 靶 | KEM 后端 | campaign | 结果 |
+|---|---|---|---|
+| `build/harness/comp_hpke_x25519` | X25519 (OpenSSL) | ~0.28M runs/60s | 0 违反 |
+| `build/harness/comp_hpke_mlkem` | ML-KEM-768 (liboqs) | ~3.3M runs/60s | 0 违反 |
+
+组合不变量 oracle（O5）：
+- **O5-roundtrip**：接收端 `open(seal(m))==m`（decaps→key schedule→AEAD 全链路）。
+- **O5-context-binding**：open 时改 info/aad → 必须失败（HPKE 上下文绑定）。
+- **O5-upstream-tamper**：篡改封装密钥 `enc` → 接收端派生出不同共享密钥 → open 必须失败。
+  这正是"单原语(L1)可能判为良性 feature 的可锻造性，在组合层暴露为端到端失败"的体现。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -82,6 +97,7 @@
 | 类型 | 内容 | 状态 |
 |---|---|---|
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
+| **L2 组合(O5)** | HPKE 往返 / 上下文绑定 / 上游篡改放大（X25519 + ML-KEM-768） | ✅ |
 | 差分 | 同算法跨 4 库输出一致性 | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
@@ -100,8 +116,9 @@
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **4/4**：故障注入使以下 oracle 全部正确触发——
-KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、多库差分(DIFF_mismatch)。
+`tests/negative_tests.sh` ✅ **5/5**：故障注入使以下 oracle 全部正确触发——
+KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
+**L2 HPKE 组合上游篡改(O5-upstream-tamper)**、多库差分(DIFF_mismatch)。
 
 ---
 
@@ -117,6 +134,10 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（傍晚）：**PLAN 阶段1.1** —— 新增 **L2 组合层 HPKE harness**
+  (`harness/comp_hpke_harness.c`，X25519 + ML-KEM-768 两后端)，组合不变量 oracle O5
+  （往返 / 上下文绑定 / 上游篡改放大）。两靶 campaign 0 违反；负向自测升到 **5/5**。
+  发现库结构 `findings/` 建立（本阶段 0 新发现）。
 - 2026-07-09（下午）：给传统算法补齐 **metamorphic**（`trad_metamorphic`：SHA-256 分块一致/
   确定性、HMAC 确定性/密钥敏感、AEAD 往返/篡改拒绝/错误密钥）和 **常量时间**
   （`ct_dudect_trad`：AES-NI、CRYPTO_memcmp、naive_memcmp）两类 oracle；负向自测升到 4/4。

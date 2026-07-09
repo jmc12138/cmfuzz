@@ -16,6 +16,13 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 # Traditional metamorphic harness (round-trip / tamper-reject / chunk-consistency)
 clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
   "$ROOT/harness/trad_metamorphic_harness.c" -lcrypto -o "$ROOT/build/harness/trad_metamorphic"
+# L2 composition harness: HPKE-style KEM+KDF+AEAD (X25519 + ML-KEM-768 backends)
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  -DCMF_HPKE_KEM=0 "$ROOT/harness/comp_hpke_harness.c" -lcrypto \
+  -o "$ROOT/build/harness/comp_hpke_x25519"
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  -DCMF_HPKE_KEM=1 -I"$ROOT/libs/liboqs/build/include" "$ROOT/harness/comp_hpke_harness.c" \
+  "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$ROOT/build/harness/comp_hpke_mlkem"
 # Extra libraries + multi-library differential harness (optional; skipped if the
 # extra libs failed to build so a minimal setup still succeeds).
 if bash "$ROOT/scripts/build_diff_libs.sh"; then

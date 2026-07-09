@@ -33,10 +33,14 @@ clang $SAN $INC -DCMF_SIG_ALG='"ML-DSA-65"' -DCMF_FAULT_MR3 \
 clang $SAN -DCMF_FAULT_TRAD=1 \
   "$ROOT/harness/trad_metamorphic_harness.c" -lcrypto -o "$TMP/trad_fault"
 
+clang $SAN -DCMF_HPKE_KEM=0 -DCMF_FAULT_HPKE=1 \
+  "$ROOT/harness/comp_hpke_harness.c" -lcrypto -o "$TMP/hpke_fault"
+
 echo "[neg] running..."
 check "KEM correctness (MR1) detects corrupted shared secret" "$TMP/kem_fault_mr1" "MR1_correctness"
 check "SIG SUF (MR3) detects malleable-verify"                 "$TMP/sig_fault_mr3" "MR3_strong_unforgeability"
 check "Traditional AEAD tamper-reject detects forged tag"     "$TMP/trad_fault" "tamper_reject"
+check "L2 HPKE composition detects tampered encapsulated key" "$TMP/hpke_fault" "O5-upstream-tamper"
 
 # Differential oracle self-test (only if the extra libs are built).
 if [ -f "$ROOT/libs/cryptopp/libcryptopp.a" ] && \
