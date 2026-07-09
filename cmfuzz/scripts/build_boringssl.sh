@@ -5,6 +5,9 @@
 # binary that links ONLY BoringSSL, and the differential runner drives it as a
 # subprocess (see harness/subproc/). Needs cmake + ninja + Go.
 set -uo pipefail
+# Prefer a manually installed Go under /usr/local/go if present (BoringSSL builds
+# with the apt 1.18 too, but the Docker image ships Go 1.22 there for aws-lc).
+[ -x /usr/local/go/bin/go ] && export PATH="/usr/local/go/bin:$PATH"
 LIBS="$(cd "$(dirname "$0")/../libs" && pwd)"
 BSSL="$LIBS/boringssl"
 if [ ! -d "$BSSL/.git" ]; then

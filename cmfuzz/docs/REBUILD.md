@@ -32,11 +32,13 @@ keep it small/fast. Build them on demand inside the container:
 bash scripts/build_seal.sh        # FHE harness (heavy C++ build)
 bash scripts/build_diff_libs.sh   # differential libs, then:
 bash scripts/build_diff_harness.sh
-bash scripts/build_subproc.sh     # stage-2.1 BoringSSL subprocess differential + L3 harness (needs Go)
+bash scripts/build_subproc.sh     # stage-2.1 BoringSSL + aws-lc subprocess differential + L3 harnesses (needs Go)
 ```
 
-The image preinstalls `golang-go`, so `build_subproc.sh` (which clones + builds
-BoringSSL) works on demand inside the container.
+The image preinstalls Go 1.22 under `/usr/local/go`, so `build_subproc.sh` (which
+clones + builds BoringSSL and aws-lc) works on demand inside the container.
+aws-lc's cmake requires **Go >= 1.20**; BoringSSL is built first and aws-lc is
+skipped gracefully if Go is missing/too old.
 
 ---
 
@@ -49,8 +51,11 @@ sudo apt-get update
 sudo apt-get install -y clang cmake ninja-build libssl-dev git python3
 # optional (only for the differential libs):
 sudo apt-get install -y build-essential autoconf automake libtool pkg-config
-# optional (only for the BoringSSL subprocess differential, stage 2.1):
-sudo apt-get install -y golang-go
+# optional (only for the BoringSSL/aws-lc subprocess differential, stage 2.1):
+# aws-lc needs Go >= 1.20; Ubuntu 22.04's apt golang-go is 1.18.1 (too old for
+# aws-lc, fine for BoringSSL). Install an official Go toolchain for aws-lc:
+curl -fsSL -o /tmp/go.tgz https://go.dev/dl/go1.22.5.linux-amd64.tar.gz \
+  && sudo tar -C /usr/local -xzf /tmp/go.tgz    # -> /usr/local/go/bin/go
 ```
 
 Versions known-good: **clang 14**, **cmake 3.22**, **ninja 1.10**, **OpenSSL/libssl-dev 3.0.2**.
@@ -100,14 +105,18 @@ timeout 60 ./build/harness/comp_hpke_mlkem -max_total_time=60 -print_final_stats
 
 ## Gotchas
 
-- **liboqs / SEAL / the diff libs / BoringSSL are not in git** — they are cloned by
-  their build scripts (`build_liboqs.sh`, `build_seal.sh`, `build_diff_libs.sh`
-  which pins libsodium 1.0.20 / mbedtls-3.6.2 / cryptopp 8.9.0, and
-  `build_boringssl.sh`). First build needs network access.
-- **BoringSSL needs Go and links with `clang++`** — its static `libcrypto.a`
-  contains C++ objects, so its consumers (the compute CLI + L3 harness) must be
-  *linked* with `clang++` even though the sources are C. `build_subproc.sh`
-  handles this; see it for the exact commands.
+- **liboqs / SEAL / the diff libs / BoringSSL / aws-lc are not in git** — they are
+  cloned by their build scripts (`build_liboqs.sh`, `build_seal.sh`,
+  `build_diff_libs.sh` which pins libsodium 1.0.20 / mbedtls-3.6.2 / cryptopp
+  8.9.0, `build_boringssl.sh`, and `build_aws_lc.sh`). First build needs network
+  access.
+- **BoringSSL/aws-lc need Go and link with `clang++`** — their static
+  `libcrypto.a` contains C++ objects, so consumers (compute CLI + L3 harness)
+  must be *linked* with `clang++` even though the sources are C.
+  `build_subproc.sh` handles this. **aws-lc's cmake requires Go >= 1.20**; the
+  build scripts prefer `/usr/local/go/bin` over the apt Go (1.18.1) when present.
+  aws-lc is optional in `build_subproc.sh` (BoringSSL is built first, aws-lc
+  skipped if its build fails).
 - **Debug build of liboqs** is intentional: ASan/UBSan traces are useless without
   frame info. Don't switch it to Release "for speed".
 - **Optional libs skip gracefully**: `build_all.sh` and `negative_tests.sh` detect

@@ -114,6 +114,34 @@ else
   echo "SKIP  BoringSSL subprocess self-tests (BoringSSL not built; run scripts/build_boringssl.sh — needs Go)"
 fi
 
+# aws-lc subprocess differential + L3 self-tests (only if aws-lc built; needs Go >= 1.20).
+AWSLC_A="$(find "$ROOT/libs/aws-lc/build" -name libcrypto.a 2>/dev/null | head -1)"
+if [ -n "$AWSLC_A" ]; then
+  AINC="-I$ROOT/libs/aws-lc/include"; ASAN="-fsanitize=address,fuzzer -g -O1"
+  SUB="$ROOT/harness/subproc"
+  echo "[neg] building aws-lc fault-injected L3 harnesses..."
+  clang $ASAN $AINC -DCMF_FAULT_NONCE=1 -c "$SUB/seq_aws_lc_harness.c" -o "$TMP/san.o"
+  clang++ $ASAN "$TMP/san.o" "$AWSLC_A" -lpthread -o "$TMP/awslc_nonce" 2>/dev/null
+  clang $ASAN $AINC -DCMF_FAULT_RELEASE=1 -c "$SUB/seq_aws_lc_harness.c" -o "$TMP/sar.o"
+  clang++ $ASAN "$TMP/sar.o" "$AWSLC_A" -lpthread -o "$TMP/awslc_release" 2>/dev/null
+  check "L3 aws-lc EVP_AEAD detects nonce reuse"              "$TMP/awslc_nonce" "O6-nonce-uniqueness"
+  check "L3 aws-lc EVP_AEAD detects release-before-verify"    "$TMP/awslc_release" "O6-release-before-verify"
+
+  echo "[neg] building aws-lc subprocess differential self-test..."
+  [ -x "$TMP/diff_subproc" ] || clang -g -O1 "$SUB/diff_subproc_runner.c" -I"$SUB" -lcrypto -o "$TMP/diff_subproc"
+  clang -g -O1 -DCMF_DIFF_FAULT=1 -c "$SUB/compute_aws_lc.c" $AINC -I"$SUB" -o "$TMP/caf.o"
+  clang++ -g -O1 "$TMP/caf.o" "$AWSLC_A" -lpthread -o "$TMP/compute_awslc_fault" 2>/dev/null
+  "$TMP/diff_subproc" 200 12345 aws-lc_fault="$TMP/compute_awslc_fault" > "$TMP/subout_awslc.txt" 2>&1 || true
+  cat "$TMP/subout_awslc.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/subout_awslc.txt"; then
+    echo "PASS  Subprocess differential detects divergent aws-lc backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Subprocess differential aws-lc (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  aws-lc subprocess self-tests (aws-lc not built; run scripts/build_aws_lc.sh — needs Go >= 1.20)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

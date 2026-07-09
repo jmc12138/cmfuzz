@@ -13,11 +13,12 @@
 #
 # liboqs is cloned + built *inside* the image (it is gitignored and not shipped
 # in the repo). The optional differential libs (libsodium/mbedtls/crypto++),
-# Microsoft SEAL, and BoringSSL (stage-2.1 subprocess differential) are NOT built
-# here to keep the image small/fast; run scripts/build_diff_libs.sh,
+# Microsoft SEAL, and BoringSSL/aws-lc (stage-2.1 subprocess differential) are
+# NOT built here to keep the image small/fast; run scripts/build_diff_libs.sh,
 # scripts/build_seal.sh, or scripts/build_subproc.sh inside the container if you
-# need the differential (O1), FHE, or BoringSSL harnesses. Go is preinstalled so
-# build_subproc.sh (which builds BoringSSL) works on demand.
+# need the differential (O1), FHE, or BoringSSL/aws-lc harnesses. Go 1.22 is
+# preinstalled under /usr/local/go so build_subproc.sh (which builds BoringSSL
+# and aws-lc — the latter needs Go >= 1.20) works on demand.
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -41,8 +42,17 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         automake \
         libtool \
         pkg-config \
-        golang-go \
+        curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Go >= 1.20 is required by aws-lc's cmake (BoringSSL also uses Go). Ubuntu
+# 22.04's apt golang-go is 1.18.1 (too old), so install an official toolchain.
+ARG GO_VERSION=1.22.5
+RUN arch="$(dpkg --print-architecture)" \
+    && curl -fsSL -o /tmp/go.tgz "https://go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz" \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 WORKDIR /opt/cmfuzz
 COPY . /opt/cmfuzz
