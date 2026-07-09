@@ -76,4 +76,7 @@ bash "$ROOT/scripts/build_nettle_diff.sh" || echo "[build_all] nettle diff skipp
 # Stage 3 ecosystem: Bouncy Castle cross-language differential (Java, independent
 # implementation). Optional: needs a JDK (javac/java).
 bash "$ROOT/scripts/build_java_diff.sh" || echo "[build_all] Java diff skipped (JDK missing)"
+# Stage 3 ecosystem: TFHE-rs homomorphic-integer correctness oracle (Rust FHE,
+# independent of SEAL/OpenFHE). Optional + heavy (~2 min first compile): needs cargo.
+bash "$ROOT/scripts/build_tfhe.sh" || echo "[build_all] TFHE-rs oracle skipped (cargo missing)"
 echo "[build_all] done"

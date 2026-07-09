@@ -5,3 +5,5 @@ build/
 libs/
 # Rust cross-language backend build artifacts (rebuilt by build_rust_diff.sh).
 harness/rustbridge/target/
+# TFHE-rs FHE oracle build artifacts (rebuilt by build_tfhe.sh).
+harness/tfhebridge/target/

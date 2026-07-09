@@ -1,0 +1,23 @@
+[package]
+name = "cmf-tfhe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# TFHE-rs is Zama's Rust FHE library (TFHE/CGGI scheme over encrypted integers).
+# It is an independent FHE implementation distinct from SEAL/OpenFHE (BFV/CKKS),
+# so this extends the stage-2.5 FHE oracle family with a third, Rust-native lineage.
+[dependencies]
+tfhe = { version = "0.8", features = ["integer", "seeder_unix"] }
+
+[features]
+# Fault injection for the negative self-test: corrupts one homomorphic result so
+# the metamorphic oracle must fire.
+fault = []
+
+[[bin]]
+name = "cmf_tfhe"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3

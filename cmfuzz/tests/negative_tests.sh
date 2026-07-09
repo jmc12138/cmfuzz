@@ -350,6 +350,24 @@ else
   echo "SKIP  FHE oracle self-tests (OpenFHE/SEAL not built; run scripts/build_openfhe.sh + build_seal.sh)"
 fi
 
+# Stage 3 ecosystem: TFHE-rs homomorphic-integer correctness oracle self-test.
+# Heavy (Rust FHE); only runs if the oracle was already built (build_tfhe.sh),
+# so the base image build — which does not compile TFHE-rs — skips it.
+if [ -x "$ROOT/build/harness/cmf_tfhe" ] && command -v cargo >/dev/null 2>&1; then
+  echo "[neg] building fault-injected TFHE-rs oracle..."
+  bash "$ROOT/scripts/build_tfhe.sh" fault >/dev/null 2>&1
+  "$ROOT/build/harness/cmf_tfhe_fault" 1 12345 > "$TMP/tfhe.txt" 2>&1 || true
+  cat "$TMP/tfhe.txt" >&2
+  if grep -q "oracle=O_tfhe_int_correctness" "$TMP/tfhe.txt"; then
+    echo "PASS  TFHE-rs oracle detects corrupted homomorphic result (O_tfhe_int_correctness)"; pass=$((pass+1))
+  else
+    echo "FAIL  TFHE-rs oracle (expected O_tfhe_int_correctness)"; fail=$((fail+1))
+  fi
+  # build_tfhe.sh already restored the clean (non-fault) binary.
+else
+  echo "SKIP  TFHE-rs oracle self-test (not built; run scripts/build_tfhe.sh)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]
