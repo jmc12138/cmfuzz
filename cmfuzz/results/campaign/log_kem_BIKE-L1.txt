@@ -1,0 +1,22 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1812589213
+INFO: Loaded 1 modules   (65 inline 8-bit counters): 65 [0x5604467bed00, 0x5604467bed41), 
+INFO: Loaded 1 PC tables (65 PCs): 65 [0x5604467bed48,0x5604467bf158), 
+INFO:        0 files found in /home/ubuntu/crypto-fuzz-project/results/corpus/kem_BIKE-L1
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/2]: 0x5604463438f0 in cmf_u8 /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x560446343ae0 in cmf_randombytes /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:44
+#444	NEW    cov: 17 ft: 18 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 2 InsertRepeatedBytes-CopyPart-
+#447	NEW    cov: 19 ft: 23 corp: 3/17b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 3 ChangeBinInt-CrossOver-ChangeByte-
+#460	NEW    cov: 20 ft: 24 corp: 4/25b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 3 ChangeBit-ShuffleBytes-ShuffleBytes-
+#773	NEW    cov: 20 ft: 25 corp: 5/34b lim: 11 exec/s: 386 rss: 37Mb L: 9/9 MS: 3 ChangeByte-ChangeByte-InsertByte-
+#776	NEW    cov: 20 ft: 26 corp: 6/45b lim: 11 exec/s: 388 rss: 37Mb L: 11/11 MS: 3 CopyPart-ChangeByte-CrossOver-
+#838	REDUCE cov: 20 ft: 26 corp: 6/44b lim: 11 exec/s: 279 rss: 38Mb L: 10/10 MS: 2 ChangeBinInt-EraseBytes-
+#1024	pulse  cov: 20 ft: 26 corp: 6/44b lim: 11 exec/s: 256 rss: 41Mb
+#1154	NEW    cov: 20 ft: 27 corp: 7/58b lim: 14 exec/s: 192 rss: 43Mb L: 14/14 MS: 1 InsertRepeatedBytes-
+#2048	pulse  cov: 20 ft: 27 corp: 7/58b lim: 21 exec/s: 128 rss: 59Mb
+#2274	NEW    cov: 20 ft: 28 corp: 8/82b lim: 25 exec/s: 119 rss: 64Mb L: 24/24 MS: 5 ChangeByte-InsertRepeatedBytes-ChangeByte-CopyPart-InsertRepeatedBytes-
+#2376	REDUCE cov: 20 ft: 28 corp: 8/81b lim: 25 exec/s: 118 rss: 66Mb L: 23/23 MS: 2 ChangeBinInt-EraseBytes-
+==51737== libFuzzer: run interrupted; exiting

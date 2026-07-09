@@ -1,0 +1,18 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2185852626
+INFO: Loaded 1 modules   (70 inline 8-bit counters): 70 [0x55f10a102f80, 0x55f10a102fc6), 
+INFO: Loaded 1 PC tables (70 PCs): 70 [0x55f10a102fc8,0x55f10a103428), 
+INFO:        0 files found in /home/ubuntu/crypto-fuzz-project/results/corpus/sig_SLH_DSA_PURE_SHA2_128F
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/2]: 0x55f1094249d0 in cmf_u8 /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x55f109424bc0 in cmf_randombytes /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:44
+#426	NEW    cov: 20 ft: 21 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 4 CopyPart-ChangeBinInt-ChangeByte-InsertRepeatedBytes-
+#431	NEW    cov: 23 ft: 24 corp: 3/17b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 5 EraseBytes-InsertByte-InsertByte-InsertByte-InsertByte-
+#435	NEW    cov: 24 ft: 28 corp: 4/25b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 4 ChangeBit-CopyPart-ChangeBit-ShuffleBytes-
+#512	pulse  cov: 24 ft: 28 corp: 4/25b lim: 8 exec/s: 102 rss: 35Mb
+#746	NEW    cov: 24 ft: 30 corp: 5/34b lim: 11 exec/s: 41 rss: 40Mb L: 9/9 MS: 1 InsertByte-
+#748	NEW    cov: 24 ft: 31 corp: 6/45b lim: 11 exec/s: 41 rss: 40Mb L: 11/11 MS: 2 InsertByte-CrossOver-
+#789	REDUCE cov: 24 ft: 31 corp: 6/44b lim: 11 exec/s: 39 rss: 41Mb L: 10/10 MS: 1 EraseBytes-
+==54853== libFuzzer: run interrupted; exiting

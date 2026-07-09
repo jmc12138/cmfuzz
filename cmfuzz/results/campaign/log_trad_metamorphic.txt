@@ -1,0 +1,13 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 836462254
+INFO: Loaded 1 modules   (65 inline 8-bit counters): 65 [0x55fa251d47a0, 0x55fa251d47e1), 
+INFO: Loaded 1 PC tables (65 PCs): 65 [0x55fa251d47e8,0x55fa251d4bf8), 
+INFO:       19 files found in results/corpus/trad_metamorphic
+INFO: seed corpus: files: 19 min: 1b max: 259b total: 1215b rss: 31Mb
+#23	INITED cov: 26 ft: 35 corp: 12/727b exec/s: 0 rss: 36Mb
+#262144	pulse  cov: 26 ft: 35 corp: 12/727b lim: 1024 exec/s: 131072 rss: 443Mb
+#524288	pulse  cov: 26 ft: 35 corp: 12/727b lim: 1024 exec/s: 131072 rss: 445Mb
+#1048576	pulse  cov: 26 ft: 35 corp: 12/727b lim: 1024 exec/s: 116508 rss: 449Mb
+#2097152	pulse  cov: 26 ft: 35 corp: 12/727b lim: 1024 exec/s: 110376 rss: 454Mb
+#4194304	pulse  cov: 26 ft: 35 corp: 12/727b lim: 1024 exec/s: 110376 rss: 466Mb
+==202920== libFuzzer: run interrupted; exiting

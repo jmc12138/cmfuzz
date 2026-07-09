@@ -1,0 +1,37 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3307104206
+INFO: Loaded 1 modules   (97 inline 8-bit counters): 97 [0x561a0ee415a0, 0x561a0ee41601), 
+INFO: Loaded 1 PC tables (97 PCs): 97 [0x561a0ee41608,0x561a0ee41c18), 
+INFO:        0 files found in /home/ubuntu/crypto-fuzz-project/results/corpus/classic_openssl
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 31Mb
+	NEW_FUNC[1/2]: 0x561a0edfe9f0 in cmf_u8 /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x561a0edfed20 in cmf_rest /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:73
+#433	NEW    cov: 36 ft: 37 corp: 2/9b lim: 8 exec/s: 0 rss: 35Mb L: 8/8 MS: 5 CopyPart-ShuffleBytes-CMP-ChangeByte-InsertRepeatedBytes- DE: "\000\000"-
+#450	NEW    cov: 49 ft: 50 corp: 3/17b lim: 8 exec/s: 0 rss: 36Mb L: 8/8 MS: 1 ChangeByte-
+#758	NEW    cov: 49 ft: 51 corp: 4/26b lim: 11 exec/s: 0 rss: 37Mb L: 9/9 MS: 3 ChangeByte-ShuffleBytes-CrossOver-
+#1396	NEW    cov: 49 ft: 53 corp: 5/42b lim: 17 exec/s: 0 rss: 38Mb L: 16/16 MS: 3 EraseBytes-CopyPart-CrossOver-
+#1399	NEW    cov: 49 ft: 54 corp: 6/59b lim: 17 exec/s: 0 rss: 38Mb L: 17/17 MS: 3 CrossOver-CrossOver-InsertRepeatedBytes-
+#2221	NEW    cov: 51 ft: 57 corp: 7/84b lim: 25 exec/s: 0 rss: 40Mb L: 25/25 MS: 2 CopyPart-InsertRepeatedBytes-
+#2334	NEW    cov: 51 ft: 60 corp: 8/106b lim: 25 exec/s: 0 rss: 40Mb L: 22/25 MS: 3 InsertRepeatedBytes-InsertByte-InsertRepeatedBytes-
+#2358	NEW    cov: 51 ft: 63 corp: 9/129b lim: 25 exec/s: 0 rss: 40Mb L: 23/25 MS: 4 PersAutoDict-ChangeBinInt-EraseBytes-InsertByte- DE: "\000\000"-
+#2462	REDUCE cov: 51 ft: 63 corp: 9/128b lim: 25 exec/s: 0 rss: 40Mb L: 24/24 MS: 4 CrossOver-EraseBytes-ChangeBinInt-InsertByte-
+#2886	NEW    cov: 51 ft: 65 corp: 10/155b lim: 29 exec/s: 0 rss: 41Mb L: 27/27 MS: 4 CMP-CrossOver-ChangeByte-InsertRepeatedBytes- DE: "\376\377\377\377"-
+#2923	NEW    cov: 51 ft: 67 corp: 11/184b lim: 29 exec/s: 0 rss: 41Mb L: 29/29 MS: 2 PersAutoDict-CrossOver- DE: "\000\000"-
+#3338	NEW    cov: 51 ft: 71 corp: 12/217b lim: 33 exec/s: 0 rss: 42Mb L: 33/33 MS: 5 CrossOver-CMP-ChangeBinInt-ChangeByte-CMP- DE: "\323\017\004\0000`\000\000"-"\377\377\377\377"-
+#3848	NEW    cov: 51 ft: 73 corp: 13/254b lim: 38 exec/s: 0 rss: 42Mb L: 37/37 MS: 5 ChangeBit-CMP-CopyPart-CopyPart-InsertByte- DE: "upd"-
+#3850	NEW    cov: 51 ft: 74 corp: 14/292b lim: 38 exec/s: 0 rss: 43Mb L: 38/38 MS: 2 PersAutoDict-InsertRepeatedBytes- DE: "upd"-
+#4379	NEW    cov: 51 ft: 77 corp: 15/331b lim: 43 exec/s: 0 rss: 43Mb L: 39/39 MS: 4 CopyPart-CrossOver-ShuffleBytes-InsertRepeatedBytes-
+#13843	NEW    cov: 51 ft: 80 corp: 16/461b lim: 135 exec/s: 0 rss: 57Mb L: 130/130 MS: 4 ShuffleBytes-CrossOver-InsertRepeatedBytes-PersAutoDict- DE: "upd"-
+#14727	NEW    cov: 51 ft: 83 corp: 17/602b lim: 142 exec/s: 0 rss: 59Mb L: 141/141 MS: 4 CrossOver-ChangeBinInt-InsertRepeatedBytes-InsertRepeatedBytes-
+#15762	REDUCE cov: 51 ft: 83 corp: 17/601b lim: 149 exec/s: 0 rss: 60Mb L: 129/141 MS: 5 CrossOver-CrossOver-InsertRepeatedBytes-InsertByte-InsertRepeatedBytes-
+#27529	NEW    cov: 51 ft: 85 corp: 18/858b lim: 261 exec/s: 0 rss: 77Mb L: 257/257 MS: 2 InsertRepeatedBytes-PersAutoDict- DE: "\376\377\377\377"-
+#27656	NEW    cov: 51 ft: 88 corp: 19/1116b lim: 261 exec/s: 0 rss: 78Mb L: 258/258 MS: 2 ChangeBit-InsertByte-
+#27669	NEW    cov: 51 ft: 91 corp: 20/1376b lim: 261 exec/s: 0 rss: 78Mb L: 260/260 MS: 3 InsertByte-EraseBytes-InsertRepeatedBytes-
+#27691	NEW    cov: 51 ft: 94 corp: 21/1635b lim: 261 exec/s: 0 rss: 78Mb L: 259/260 MS: 2 CopyPart-CrossOver-
+#524288	pulse  cov: 51 ft: 94 corp: 21/1635b lim: 4096 exec/s: 262144 rss: 469Mb
+#1048576	pulse  cov: 51 ft: 94 corp: 21/1635b lim: 4096 exec/s: 262144 rss: 472Mb
+#2097152	pulse  cov: 51 ft: 94 corp: 21/1635b lim: 4096 exec/s: 233016 rss: 472Mb
+#4194304	pulse  cov: 51 ft: 94 corp: 21/1635b lim: 4096 exec/s: 233016 rss: 472Mb
+==49007== libFuzzer: run interrupted; exiting

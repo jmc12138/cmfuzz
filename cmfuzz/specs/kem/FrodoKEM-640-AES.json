@@ -1,0 +1,52 @@
+{
+  "name": "FrodoKEM-640-AES",
+  "library": "liboqs",
+  "kind": "kem",
+  "lib_alg_id": "FrodoKEM-640-AES",
+  "security_notion": "IND-CCA2",
+  "function_signature": {
+    "keypair": "OQS_STATUS keypair(uint8_t *pk, uint8_t *sk)",
+    "encaps": "OQS_STATUS encaps(uint8_t *ct, uint8_t *ss, const uint8_t *pk)",
+    "decaps": "OQS_STATUS decaps(uint8_t *ss, const uint8_t *ct, const uint8_t *sk)"
+  },
+  "input_constraints": {
+    "ciphertext": {
+      "len": "length_ciphertext",
+      "note": "fixed length; attacker-controlled in MEM mode"
+    }
+  },
+  "oracles": [
+    {
+      "id": "MR1_correctness",
+      "type": "metamorphic",
+      "relation": "decaps(sk, encaps(pk).ct) == encaps(pk).ss"
+    },
+    {
+      "id": "MR2_malleability",
+      "type": "security",
+      "notion": "IND-CCA2",
+      "relation": "decaps(sk, mutate(ct)) != ss"
+    },
+    {
+      "id": "MR3_wrong_key",
+      "type": "security",
+      "relation": "decaps(sk', ct) != ss for sk' != sk"
+    },
+    {
+      "id": "MR4_determinism",
+      "type": "metamorphic",
+      "relation": "decaps(sk, ct) stable"
+    },
+    {
+      "id": "MEM",
+      "type": "memory",
+      "relation": "decaps(sk, arbitrary_bytes) memory-safe"
+    }
+  ],
+  "constant_time": {
+    "target": "decaps",
+    "secret_input": "sk",
+    "public_input": "ct"
+  },
+  "source": "offline_template"
+}

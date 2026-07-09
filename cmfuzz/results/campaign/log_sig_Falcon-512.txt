@@ -1,0 +1,22 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 877933518
+INFO: Loaded 1 modules   (70 inline 8-bit counters): 70 [0x55f483d74f80, 0x55f483d74fc6), 
+INFO: Loaded 1 PC tables (70 PCs): 70 [0x55f483d74fc8,0x55f483d75428), 
+INFO:        0 files found in /home/ubuntu/crypto-fuzz-project/results/corpus/sig_Falcon-512
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/2]: 0x55f4830969d0 in cmf_u8 /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x55f483096bc0 in cmf_randombytes /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:44
+#434	NEW    cov: 20 ft: 21 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 2 CopyPart-InsertRepeatedBytes-
+#435	NEW    cov: 22 ft: 23 corp: 3/17b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 1 ShuffleBytes-
+#451	NEW    cov: 24 ft: 28 corp: 4/25b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 1 CMP- DE: "\317\242\370\030g&\"\337"-
+#757	NEW    cov: 24 ft: 30 corp: 5/36b lim: 11 exec/s: 252 rss: 35Mb L: 11/11 MS: 1 CopyPart-
+#758	NEW    cov: 24 ft: 31 corp: 6/45b lim: 11 exec/s: 252 rss: 35Mb L: 9/11 MS: 1 CrossOver-
+#794	REDUCE cov: 24 ft: 31 corp: 6/44b lim: 11 exec/s: 198 rss: 36Mb L: 10/10 MS: 1 CrossOver-
+#1024	pulse  cov: 24 ft: 31 corp: 6/44b lim: 11 exec/s: 146 rss: 38Mb
+#1102	NEW    cov: 24 ft: 34 corp: 7/58b lim: 14 exec/s: 122 rss: 38Mb L: 14/14 MS: 3 CrossOver-ShuffleBytes-PersAutoDict- DE: "\317\242\370\030g&\"\337"-
+#1857	NEW    cov: 24 ft: 35 corp: 8/78b lim: 21 exec/s: 88 rss: 45Mb L: 20/20 MS: 5 InsertByte-CrossOver-InsertRepeatedBytes-ChangeBit-InsertRepeatedBytes-
+#1865	NEW    cov: 24 ft: 36 corp: 9/99b lim: 21 exec/s: 88 rss: 45Mb L: 21/21 MS: 3 EraseBytes-ChangeBit-CopyPart-
+#2048	pulse  cov: 24 ft: 36 corp: 9/99b lim: 21 exec/s: 89 rss: 46Mb
+==54017== libFuzzer: run interrupted; exiting

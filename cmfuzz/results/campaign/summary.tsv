@@ -1,0 +1,15 @@
+target	runs	cov	features	crashes	status
+classic_openssl	4194304	51	94	0	ok
+fhe_seal_bfv	512	196	206	0	ok
+kem_BIKE-L1	2376	20	28	0	ok
+kem_FrodoKEM-640-AES	2048	20	28	0	ok
+kem_Kyber768	262144	21	32	0	ok
+kem_ML-KEM-1024	131072	20	32	0	ok
+kem_ML-KEM-512	317237	21	33	0	ok
+kem_ML-KEM-768	254989	21	34	0	ok
+sig_Falcon-1024	1102	24	34	0	ok
+sig_Falcon-512	2048	24	36	0	ok
+sig_ML-DSA-44	65536	25	50	0	ok
+sig_ML-DSA-65	32768	25	50	0	ok
+sig_ML-DSA-87	33213	25	50	0	ok
+sig_SLH_DSA_PURE_SHA2_128F	789	24	31	0	ok

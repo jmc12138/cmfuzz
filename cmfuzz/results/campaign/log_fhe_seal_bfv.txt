@@ -1,0 +1,14 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2566691165
+INFO: Loaded 1 modules   (945 inline 8-bit counters): 945 [0x564b1e82e0f8, 0x564b1e82e4a9), 
+INFO: Loaded 1 PC tables (945 PCs): 945 [0x564b1e82e4b0,0x564b1e831fc0), 
+INFO:       10 files found in /home/ubuntu/crypto-fuzz-project/results/corpus/fhe_seal_bfv
+INFO: seed corpus: files: 10 min: 1b max: 48b total: 315b rss: 27Mb
+#11	INITED cov: 196 ft: 206 corp: 3/51b exec/s: 0 rss: 60Mb
+#43	REDUCE cov: 196 ft: 206 corp: 3/50b lim: 26 exec/s: 0 rss: 60Mb L: 25/25 MS: 2 CopyPart-EraseBytes-
+#128	pulse  cov: 196 ft: 206 corp: 3/50b lim: 26 exec/s: 42 rss: 60Mb
+#162	REDUCE cov: 196 ft: 206 corp: 3/49b lim: 26 exec/s: 54 rss: 60Mb L: 24/24 MS: 3 ChangeBinInt-CopyPart-EraseBytes-
+#256	pulse  cov: 196 ft: 206 corp: 3/49b lim: 26 exec/s: 42 rss: 60Mb
+#512	pulse  cov: 196 ft: 206 corp: 3/49b lim: 26 exec/s: 36 rss: 60Mb
+==49054== libFuzzer: run interrupted; exiting
+==49054== libFuzzer: run interrupted; exiting

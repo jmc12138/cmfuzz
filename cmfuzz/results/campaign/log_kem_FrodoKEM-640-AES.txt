@@ -1,0 +1,20 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1058442293
+INFO: Loaded 1 modules   (65 inline 8-bit counters): 65 [0x5590ec3add00, 0x5590ec3add41), 
+INFO: Loaded 1 PC tables (65 PCs): 65 [0x5590ec3add48,0x5590ec3ae158), 
+INFO:        0 files found in /home/ubuntu/crypto-fuzz-project/results/corpus/kem_FrodoKEM-640-AES
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/2]: 0x5590ebf328f0 in cmf_u8 /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x5590ebf32ae0 in cmf_randombytes /home/ubuntu/crypto-fuzz-project/harness/../engine/cmfuzz_common.h:44
+#409	NEW    cov: 17 ft: 18 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 2 ShuffleBytes-InsertRepeatedBytes-
+#412	NEW    cov: 18 ft: 19 corp: 3/17b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 3 ChangeByte-ChangeBit-CMP- DE: "\013:\341\034\177P\316\013"-
+#421	NEW    cov: 19 ft: 24 corp: 4/25b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 4 ChangeBit-ShuffleBytes-CrossOver-ChangeByte-
+#444	NEW    cov: 20 ft: 25 corp: 5/33b lim: 8 exec/s: 0 rss: 36Mb L: 8/8 MS: 3 CrossOver-PersAutoDict-ShuffleBytes- DE: "\013:\341\034\177P\316\013"-
+#755	NEW    cov: 20 ft: 26 corp: 6/42b lim: 11 exec/s: 188 rss: 52Mb L: 9/9 MS: 1 InsertByte-
+#757	NEW    cov: 20 ft: 27 corp: 7/52b lim: 11 exec/s: 189 rss: 52Mb L: 10/10 MS: 2 ShuffleBytes-InsertByte-
+#1024	pulse  cov: 20 ft: 27 corp: 7/52b lim: 11 exec/s: 128 rss: 68Mb
+#1098	NEW    cov: 20 ft: 28 corp: 8/66b lim: 14 exec/s: 137 rss: 72Mb L: 14/14 MS: 1 InsertRepeatedBytes-
+#2048	pulse  cov: 20 ft: 28 corp: 8/66b lim: 21 exec/s: 93 rss: 133Mb
+==52423== libFuzzer: run interrupted; exiting

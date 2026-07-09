@@ -1,0 +1,47 @@
+{
+  "name": "SLH_DSA_SHA2_512_224_PREHASH_SHAKE_192S",
+  "library": "liboqs",
+  "kind": "sig",
+  "lib_alg_id": "SLH_DSA_SHA2_512_224_PREHASH_SHAKE_192S",
+  "security_notion": "EUF-CMA",
+  "function_signature": {
+    "keypair": "OQS_STATUS keypair(uint8_t *pk, uint8_t *sk)",
+    "sign": "OQS_STATUS sign(uint8_t *sig, size_t *siglen, const uint8_t *m, size_t mlen, const uint8_t *sk)",
+    "verify": "OQS_STATUS verify(const uint8_t *m, size_t mlen, const uint8_t *sig, size_t siglen, const uint8_t *pk)"
+  },
+  "oracles": [
+    {
+      "id": "MR1_correctness",
+      "type": "metamorphic",
+      "relation": "verify(pk, m, sign(sk, m)) == 1"
+    },
+    {
+      "id": "MR2_message_binding",
+      "type": "security",
+      "notion": "EUF-CMA",
+      "relation": "verify(pk, m', sig) == 0 for m' != m"
+    },
+    {
+      "id": "MR3_strong_unforgeability",
+      "type": "security",
+      "notion": "SUF-CMA",
+      "relation": "verify(pk, m, mutate(sig)) == 0"
+    },
+    {
+      "id": "MR4_wrong_key",
+      "type": "security",
+      "relation": "verify(pk', m, sig) == 0 for pk' != pk"
+    },
+    {
+      "id": "MEM",
+      "type": "memory",
+      "relation": "verify(pk, m, arbitrary_bytes) memory-safe"
+    }
+  ],
+  "constant_time": {
+    "target": "sign",
+    "secret_input": "sk",
+    "public_input": "m"
+  },
+  "source": "offline_template"
+}

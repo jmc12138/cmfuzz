@@ -1,0 +1,6 @@
+CMF_CT alg=ML-KEM-512 op=decaps meas=200000 max_t=1.81 cut=55248 verdict=OK
+CMF_CT alg=ML-KEM-768 op=decaps meas=200000 max_t=4.90 cut=54400 verdict=LEAK
+CMF_CT alg=ML-KEM-1024 op=decaps meas=200000 max_t=2.04 cut=89966 verdict=OK
+CMF_CT alg=Kyber768 op=decaps meas=200000 max_t=4.21 cut=35592 verdict=OK
+CMF_CT alg=ML-DSA-65 op=sign meas=200000 max_t=15.72 cut=211044 verdict=LEAK
+CMF_CT alg=Falcon-512 op=sign meas=200000 max_t=5.57 cut=2331084 verdict=LEAK
