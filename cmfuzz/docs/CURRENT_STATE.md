@@ -129,6 +129,20 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
   `DecryptUpdate` 产出的明文。对篡改密文，Final 失败 → 明文必须丢弃；若仍交付则违反
   （未验证明文释放）。
 
+### 2.9 L3 序列/误用层 —— 签名 nonce 与 KEM 密钥混淆（O6）【新】
+
+| 靶 | 后端 | campaign | 结果 |
+|---|---|---|---|
+| `build/harness/seq_ecdsa` | ECDSA P-256（可控 nonce 源） | ~0.41M runs/60s | 0 违反 |
+| `build/harness/seq_pqc_kem` | ML-KEM-768（liboqs） | ~0.63M runs/60s | 0 违反 |
+
+- **O6-ecdsa-k-uniqueness**：ECDSA 安全依赖每签名唯一且保密的 nonce k。对两个不同消息
+  签名，其 r 分量必须不同（r=x(k·G)）；r 相等 ⇔ k 被复用（经典 Sony PS3 / Android
+  SecureRandom 事故）。复用时直接从 (r,s1,s2,z1,z2) **恢复长期私钥** 作为具体后果报告。
+- **O6-kem-key-confusion**：会话中误用密钥（向 A 封装但用 B 的 sk 解封）时，安全 KEM
+  （ML-KEM 隐式拒绝）必须**不产生匹配的共享密钥**（不能虚假协商）；同时正确密钥
+  解封必须与发送方一致（O6-kem-roundtrip）。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -137,7 +151,7 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
 |---|---|---|
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
 | **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
-| **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用检测；AEAD 未验证明文释放（release-before-verify） | ✅ |
+| **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商 | ✅ |
 | 差分 | 同算法跨 4 库输出一致性 | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
@@ -156,12 +170,13 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **11/11**：故障注入使以下 oracle 全部正确触发——
+`tests/negative_tests.sh` ✅ **13/13**：故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
 **L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
 **L2 TLS1.3 seq 绑定(O5-seq-binding)**、**L2 认证 KEM transcript 绑定(O5-transcript-binding)**、
 **L2 KDF 链 key-separation(O5-key-separation)**、
 **L3 灾难性 nonce 复用(O6-nonce-uniqueness)**、**L3 未验证明文释放(O6-release-before-verify)**、
+**L3 ECDSA nonce(k) 复用(O6-ecdsa-k-uniqueness)**、**L3 KEM 密钥混淆(O6-kem-key-confusion)**、
 多库差分(DIFF_mismatch)。
 
 ---
@@ -178,6 +193,11 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（晚·2）：**PLAN 阶段1.5** —— 新增 **L3 签名 nonce 与 KEM 密钥混淆
+  harness**（O6）：`seq_ecdsa_harness.c`（ECDSA-P256 可控 nonce，k 复用→私钥恢复）、
+  `seq_pqc_harness.c`（ML-KEM-768 密钥混淆免虚假协商）。各 campaign 0 违反；
+  负向自测升到 **13/13**（新增 O6-ecdsa-k-uniqueness、O6-kem-key-confusion）。
+  至此 **PLAN 阶段1（1.1–1.5）全部完成**，L2/O5 与 L3/O6 创新主线落地。本阶段 0 新发现。
 - 2026-07-09（晚·1）：**PLAN 阶段1.4** —— 新增 **L3 序列/误用 harness**
   (`seq_aead_harness.c`，O6)：AES-256-GCM 灾难性 nonce 复用、AEAD 未验证明文释放。
   campaign 12M runs 0 违反；负向自测升到 **11/11**（新增 O6-nonce-uniqueness、

@@ -39,6 +39,13 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 # L3 sequence / API-misuse: AEAD nonce-uniqueness + release-before-verify (O6)
 clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
   "$ROOT/harness/seq_aead_harness.c" -lcrypto -o "$ROOT/build/harness/seq_aead"
+# L3 sequence / API-misuse: ECDSA per-signature nonce (k) reuse -> key recovery (O6)
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  "$ROOT/harness/seq_ecdsa_harness.c" -lcrypto -o "$ROOT/build/harness/seq_ecdsa"
+# L3 sequence / API-misuse: PQC KEM key-confusion (no false agreement) (O6)
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  -I"$ROOT/libs/liboqs/build/include" "$ROOT/harness/seq_pqc_harness.c" \
+  "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$ROOT/build/harness/seq_pqc_kem"
 # Extra libraries + multi-library differential harness (optional; skipped if the
 # extra libs failed to build so a minimal setup still succeeds).
 if bash "$ROOT/scripts/build_diff_libs.sh"; then

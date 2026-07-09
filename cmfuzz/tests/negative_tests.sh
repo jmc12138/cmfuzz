@@ -50,6 +50,10 @@ clang $SAN -DCMF_FAULT_NONCE=1 \
   "$ROOT/harness/seq_aead_harness.c" -lcrypto -o "$TMP/nonce_fault"
 clang $SAN -DCMF_FAULT_RELEASE=1 \
   "$ROOT/harness/seq_aead_harness.c" -lcrypto -o "$TMP/release_fault"
+clang $SAN -DCMF_FAULT_KREUSE=1 \
+  "$ROOT/harness/seq_ecdsa_harness.c" -lcrypto -o "$TMP/kreuse_fault"
+clang $SAN -I"$ROOT/libs/liboqs/build/include" -DCMF_FAULT_KEMSWAP=1 \
+  "$ROOT/harness/seq_pqc_harness.c" "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$TMP/kemswap_fault"
 
 echo "[neg] running..."
 check "KEM correctness (MR1) detects corrupted shared secret" "$TMP/kem_fault_mr1" "MR1_correctness"
@@ -62,6 +66,8 @@ check "L2 AuthKEM detects unbound (swappable) encapsulation"  "$TMP/ak_fault" "O
 check "L2 KDF chain detects collapsed (non-advancing) keys"   "$TMP/kdf_fault" "O5-key-separation"
 check "L3 AEAD detects catastrophic nonce reuse"              "$TMP/nonce_fault" "O6-nonce-uniqueness"
 check "L3 AEAD detects release of unverified plaintext"       "$TMP/release_fault" "O6-release-before-verify"
+check "L3 ECDSA detects per-signature nonce (k) reuse"        "$TMP/kreuse_fault" "O6-ecdsa-k-uniqueness"
+check "L3 PQC KEM detects wrong-key false agreement"          "$TMP/kemswap_fault" "O6-kem-key-confusion"
 
 # Differential oracle self-test (only if the extra libs are built).
 if [ -f "$ROOT/libs/cryptopp/libcryptopp.a" ] && \
