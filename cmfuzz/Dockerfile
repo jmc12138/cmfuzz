@@ -45,6 +45,8 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         automake \
         libtool \
         pkg-config \
+        libgcrypt20-dev \
+        nettle-dev \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -103,9 +105,11 @@ RUN bash scripts/build_pqc_diff.sh
 RUN bash scripts/build_go_diff.sh \
     && bash scripts/build_rust_diff.sh
 
-# Stage 3 ecosystem: PyCryptodome cross-language differential (Python backend;
-# its self-test runs in negative_tests below).
-RUN bash scripts/build_py_diff.sh
+# Stage 3 ecosystem: PyCryptodome (Python) + libgcrypt (GnuPG) + nettle (GnuTLS)
+# cross-library differentials; their self-tests run in negative_tests below.
+RUN bash scripts/build_py_diff.sh \
+    && bash scripts/build_gcrypt_diff.sh \
+    && bash scripts/build_nettle_diff.sh
 
 # Sanity-check the oracles actually fire on injected faults at image-build time.
 RUN bash tests/negative_tests.sh

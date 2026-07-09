@@ -270,6 +270,39 @@ else
   echo "SKIP  PyCryptodome cross-language self-test (python3/pycryptodome not installed)"
 fi
 
+# Stage 3 ecosystem: libgcrypt (GnuPG) + nettle (GnuTLS) cross-library
+# differential self-tests. Each fault variant (CMF_DIFF_FAULT) flips a byte; the
+# runner must report DIFF_mismatch. Only run if the dev headers are present.
+[ -x "$TMP/diff_subproc" ] || cc -g -O1 "$ROOT/harness/subproc/diff_subproc_runner.c" -I"$ROOT/harness/subproc" -lcrypto -o "$TMP/diff_subproc" 2>/dev/null || true
+if [ -f /usr/include/gcrypt.h ]; then
+  echo "[neg] building fault-injected libgcrypt backend..."
+  GCR_LIBS="$(command -v libgcrypt-config >/dev/null 2>&1 && libgcrypt-config --libs || echo '-lgcrypt -lgpg-error')"
+  cc -g -O1 -DCMF_DIFF_FAULT=1 "$ROOT/harness/subproc/compute_libgcrypt.c" -I"$ROOT/harness/subproc" $GCR_LIBS -o "$TMP/compute_libgcrypt_fault"
+  "$TMP/diff_subproc" 200 12345 libgcrypt_fault="$TMP/compute_libgcrypt_fault" > "$TMP/gcrout.txt" 2>&1 || true
+  cat "$TMP/gcrout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/gcrout.txt"; then
+    echo "PASS  Cross-library differential detects divergent libgcrypt backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Cross-library differential libgcrypt (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  libgcrypt cross-library self-test (libgcrypt20-dev not installed)"
+fi
+if [ -f /usr/include/nettle/sha2.h ]; then
+  echo "[neg] building fault-injected nettle backend..."
+  NET_LIBS="$(pkg-config --libs hogweed 2>/dev/null || echo '-lhogweed -lnettle -lgmp')"
+  cc -g -O1 -DCMF_DIFF_FAULT=1 "$ROOT/harness/subproc/compute_nettle.c" -I"$ROOT/harness/subproc" $NET_LIBS -o "$TMP/compute_nettle_fault"
+  "$TMP/diff_subproc" 200 12345 nettle_fault="$TMP/compute_nettle_fault" > "$TMP/netout.txt" 2>&1 || true
+  cat "$TMP/netout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/netout.txt"; then
+    echo "PASS  Cross-library differential detects divergent nettle backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Cross-library differential nettle (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  nettle cross-library self-test (nettle-dev not installed)"
+fi
+
 # Stage 2.5 FHE oracles self-test: OpenFHE<->SEAL BFV cross-library differential
 # (O1) + SEAL CKKS approximate-arithmetic error bound (O2). Only if both FHE
 # libraries are already built (OpenFHE is heavy; build_fhe_diff.sh builds it on

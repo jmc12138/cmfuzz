@@ -69,4 +69,8 @@ bash "$ROOT/scripts/build_fhe_diff.sh" || echo "[build_all] FHE diff skipped (Op
 # Stage 3 ecosystem: PyCryptodome cross-language differential (Python, independent
 # implementation). Optional: needs python3 + pycryptodome.
 bash "$ROOT/scripts/build_py_diff.sh" || echo "[build_all] Python diff skipped (pycryptodome missing)"
+# Stage 3 ecosystem: libgcrypt (GnuPG) + nettle (GnuTLS) cross-library
+# differentials. Optional: need libgcrypt20-dev / nettle-dev headers.
+bash "$ROOT/scripts/build_gcrypt_diff.sh" || echo "[build_all] libgcrypt diff skipped (headers missing)"
+bash "$ROOT/scripts/build_nettle_diff.sh" || echo "[build_all] nettle diff skipped (headers missing)"
 echo "[build_all] done"
