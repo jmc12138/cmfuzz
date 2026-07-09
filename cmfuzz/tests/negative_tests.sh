@@ -46,6 +46,11 @@ clang $SAN -DCMF_AK_PQC=0 -DCMF_FAULT_AK=1 \
 clang $SAN -DCMF_FAULT_KDF=1 \
   "$ROOT/harness/comp_kdfchain_harness.c" -lcrypto -o "$TMP/kdf_fault"
 
+clang $SAN -DCMF_FAULT_NONCE=1 \
+  "$ROOT/harness/seq_aead_harness.c" -lcrypto -o "$TMP/nonce_fault"
+clang $SAN -DCMF_FAULT_RELEASE=1 \
+  "$ROOT/harness/seq_aead_harness.c" -lcrypto -o "$TMP/release_fault"
+
 echo "[neg] running..."
 check "KEM correctness (MR1) detects corrupted shared secret" "$TMP/kem_fault_mr1" "MR1_correctness"
 check "SIG SUF (MR3) detects malleable-verify"                 "$TMP/sig_fault_mr3" "MR3_strong_unforgeability"
@@ -55,6 +60,8 @@ check "L2 EtM detects tampered ciphertext/tag"                "$TMP/etm_fault" "
 check "L2 TLS1.3 record detects wrong sequence number"        "$TMP/rec_fault" "O5-seq-binding"
 check "L2 AuthKEM detects unbound (swappable) encapsulation"  "$TMP/ak_fault" "O5-transcript-binding"
 check "L2 KDF chain detects collapsed (non-advancing) keys"   "$TMP/kdf_fault" "O5-key-separation"
+check "L3 AEAD detects catastrophic nonce reuse"              "$TMP/nonce_fault" "O6-nonce-uniqueness"
+check "L3 AEAD detects release of unverified plaintext"       "$TMP/release_fault" "O6-release-before-verify"
 
 # Differential oracle self-test (only if the extra libs are built).
 if [ -f "$ROOT/libs/cryptopp/libcryptopp.a" ] && \

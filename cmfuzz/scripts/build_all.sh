@@ -36,6 +36,9 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 # L2 KDF chain / ratchet key schedule
 clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
   "$ROOT/harness/comp_kdfchain_harness.c" -lcrypto -o "$ROOT/build/harness/comp_kdfchain"
+# L3 sequence / API-misuse: AEAD nonce-uniqueness + release-before-verify (O6)
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  "$ROOT/harness/seq_aead_harness.c" -lcrypto -o "$ROOT/build/harness/seq_aead"
 # Extra libraries + multi-library differential harness (optional; skipped if the
 # extra libs failed to build so a minimal setup still succeeds).
 if bash "$ROOT/scripts/build_diff_libs.sh"; then
