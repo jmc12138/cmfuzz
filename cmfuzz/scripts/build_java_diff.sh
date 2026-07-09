@@ -29,7 +29,9 @@ echo "$BC_SHA256  $JAR" | sha256sum -c - >/dev/null
 CC="${CC:-cc}"
 [ -x "$OUT/diff_subproc" ] || $CC -g -O1 "$SUB/diff_subproc_runner.c" -I"$SUB" -lcrypto -o "$OUT/diff_subproc"
 
-javac -cp "$JAR" -d "$CLASSES" "$BC/CmfCompute.java"
+# -encoding UTF-8: the source has UTF-8 comments; javac otherwise defaults to the
+# platform encoding (US-ASCII in a minimal container) and fails on them.
+javac -encoding UTF-8 -cp "$JAR" -d "$CLASSES" "$BC/CmfCompute.java"
 
 mk_wrapper() {  # $1 = out path, $2 = extra "VAR=val" env assignments
   cat > "$1" <<EOF
