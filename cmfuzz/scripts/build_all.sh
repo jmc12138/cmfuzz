@@ -46,6 +46,9 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
   -I"$ROOT/libs/liboqs/build/include" "$ROOT/harness/seq_pqc_harness.c" \
   "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$ROOT/build/harness/seq_pqc_kem"
+# L3 sequence / API-misuse: CBC IV-unpredictability + EVP ctx use-after-free (O6)
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  "$ROOT/harness/seq_evp_harness.c" -lcrypto -o "$ROOT/build/harness/seq_evp"
 # Extra libraries + multi-library differential harness (optional; skipped if the
 # extra libs failed to build so a minimal setup still succeeds).
 if bash "$ROOT/scripts/build_diff_libs.sh"; then

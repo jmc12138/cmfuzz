@@ -143,6 +143,17 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
   （ML-KEM 隐式拒绝）必须**不产生匹配的共享密钥**（不能虚假协商）；同时正确密钥
   解封必须与发送方一致（O6-kem-roundtrip）。
 
+### 2.10 L3 序列/误用层 —— EVP 状态机 + CBC IV 可预测性（O6）【新】
+靶：`build/harness/seq_evp`（~16.8M runs/60s，**0 违反**）。补齐 PLAN 1.4 列出的
+"EVP 状态机误用 / CBC 可预测 IV"两项，与 `seq_aead` 互补：
+
+- **O6-iv-unpredictability**：CBC 机密性要求每消息用**新鲜、不可预测**的 IV。正确实现
+  用随机 IV 时，同一明文两次加密应得到**不同**密文；固定/可预测 IV 使两次密文相同，
+  泄露"明文相等"（TLS1.0 可预测 IV / BEAST 类）。
+- **O6-ctx-use-after-free**：`EVP_CIPHER_CTX` 契约禁止在 `EVP_CIPHER_CTX_free()` 后再
+  触碰上下文；故障注入在 free 后继续 `EncryptUpdate` → 有状态 API 误用
+  （把 O4 内存安全并入 L3 序列层）。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -151,7 +162,7 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
 |---|---|---|
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
 | **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
-| **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商 | ✅ |
+| **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商；AES-256-CBC：可预测/复用 IV；EVP 上下文 use-after-free | ✅ |
 | 差分 | 同算法跨 4 库输出一致性 | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
@@ -170,13 +181,14 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **13/13**：故障注入使以下 oracle 全部正确触发——
+`tests/negative_tests.sh` ✅ **15/15**（含差分；无差分库时 14/14）：故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
 **L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
 **L2 TLS1.3 seq 绑定(O5-seq-binding)**、**L2 认证 KEM transcript 绑定(O5-transcript-binding)**、
 **L2 KDF 链 key-separation(O5-key-separation)**、
 **L3 灾难性 nonce 复用(O6-nonce-uniqueness)**、**L3 未验证明文释放(O6-release-before-verify)**、
 **L3 ECDSA nonce(k) 复用(O6-ecdsa-k-uniqueness)**、**L3 KEM 密钥混淆(O6-kem-key-confusion)**、
+**L3 可预测 IV(O6-iv-unpredictability)**、**L3 EVP 上下文 use-after-free(O6-ctx-use-after-free)**、
 多库差分(DIFF_mismatch)。
 
 ---
@@ -193,6 +205,11 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（晚·3）：**PLAN 阶段1.4 补齐** —— 新增 **L3 EVP 状态机 harness**
+  (`seq_evp_harness.c`，O6)：AES-256-CBC 可预测/复用 IV（O6-iv-unpredictability）、
+  EVP 上下文 use-after-free（O6-ctx-use-after-free），补齐 PLAN 1.4 本来列出但 seq_aead
+  未覆盖的两项。campaign 16.8M runs 0 违反；负向自测升到 **15/15**（含差分；无差分库 14/14）。
+  环境已在新 VM 重建，附 `Dockerfile`+`docs/REBUILD.md` 一键复现。本阶段 0 新发现。
 - 2026-07-09（晚·2）：**PLAN 阶段1.5** —— 新增 **L3 签名 nonce 与 KEM 密钥混淆
   harness**（O6）：`seq_ecdsa_harness.c`（ECDSA-P256 可控 nonce，k 复用→私钥恢复）、
   `seq_pqc_harness.c`（ML-KEM-768 密钥混淆免虚假协商）。各 campaign 0 违反；

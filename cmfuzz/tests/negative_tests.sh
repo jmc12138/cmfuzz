@@ -54,6 +54,10 @@ clang $SAN -DCMF_FAULT_KREUSE=1 \
   "$ROOT/harness/seq_ecdsa_harness.c" -lcrypto -o "$TMP/kreuse_fault"
 clang $SAN -I"$ROOT/libs/liboqs/build/include" -DCMF_FAULT_KEMSWAP=1 \
   "$ROOT/harness/seq_pqc_harness.c" "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$TMP/kemswap_fault"
+clang $SAN -DCMF_FAULT_IV=1 \
+  "$ROOT/harness/seq_evp_harness.c" -lcrypto -o "$TMP/iv_fault"
+clang $SAN -DCMF_FAULT_UAF=1 \
+  "$ROOT/harness/seq_evp_harness.c" -lcrypto -o "$TMP/uaf_fault"
 
 echo "[neg] running..."
 check "KEM correctness (MR1) detects corrupted shared secret" "$TMP/kem_fault_mr1" "MR1_correctness"
@@ -68,6 +72,8 @@ check "L3 AEAD detects catastrophic nonce reuse"              "$TMP/nonce_fault"
 check "L3 AEAD detects release of unverified plaintext"       "$TMP/release_fault" "O6-release-before-verify"
 check "L3 ECDSA detects per-signature nonce (k) reuse"        "$TMP/kreuse_fault" "O6-ecdsa-k-uniqueness"
 check "L3 PQC KEM detects wrong-key false agreement"          "$TMP/kemswap_fault" "O6-kem-key-confusion"
+check "L3 CBC detects predictable/reused IV"                  "$TMP/iv_fault" "O6-iv-unpredictability"
+check "L3 EVP detects context use-after-free"                 "$TMP/uaf_fault" "O6-ctx-use-after-free"
 
 # Differential oracle self-test (only if the extra libs are built).
 if [ -f "$ROOT/libs/cryptopp/libcryptopp.a" ] && \
