@@ -12,7 +12,20 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/aead.h>
+#include <openssl/hkdf.h>
 #include "compute_common.h"
+
+static int hkdf(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (!HKDF(out, CMF_HKDF_OUTLEN, EVP_sha256(), v->msg, v->msglen,
+              v->key, CMF_KEYLEN, v->aad, v->aadlen)) return -1;
+    *n = CMF_HKDF_OUTLEN; return 0;
+}
+static int pbkdf2(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (!PKCS5_PBKDF2_HMAC((const char *)v->msg, v->msglen, v->key, CMF_KEYLEN,
+                           CMF_PBKDF2_ITER, EVP_sha256(), CMF_PBKDF2_DKLEN, out))
+        return -1;
+    *n = CMF_PBKDF2_DKLEN; return 0;
+}
 
 static int digest(const EVP_MD *md, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     unsigned int ol = 0;
@@ -67,6 +80,8 @@ int main(void) {
                 case 6: rc = digest(EVP_sha3_512(), &v, out, &n); break;
                 case 7: rc = xof(EVP_shake128(), &v, out, 32, &n); break;
                 case 8: rc = xof(EVP_shake256(), &v, out, 64, &n); break;
+                case 9:  rc = hkdf(&v, out, &n); break;
+                case 10: rc = pbkdf2(&v, out, &n); break;
             }
             free(v.blob);
         }

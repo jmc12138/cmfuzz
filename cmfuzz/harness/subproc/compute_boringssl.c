@@ -12,7 +12,20 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/aead.h>
+#include <openssl/hkdf.h>
 #include "compute_common.h"
+
+static int hkdf(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (!HKDF(out, CMF_HKDF_OUTLEN, EVP_sha256(), v->msg, v->msglen,
+              v->key, CMF_KEYLEN, v->aad, v->aadlen)) return -1;
+    *n = CMF_HKDF_OUTLEN; return 0;
+}
+static int pbkdf2(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (!PKCS5_PBKDF2_HMAC((const char *)v->msg, v->msglen, v->key, CMF_KEYLEN,
+                           CMF_PBKDF2_ITER, EVP_sha256(), CMF_PBKDF2_DKLEN, out))
+        return -1;
+    *n = CMF_PBKDF2_DKLEN; return 0;
+}
 
 static int digest(const EVP_MD *md, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     unsigned int ol = 0;
@@ -53,6 +66,8 @@ int main(void) {
                 case 4: rc = aead(EVP_aead_aes_256_gcm(), &v, out, &n); break;
                 /* This BoringSSL build exposes no SHA-3/SHAKE via EVP. */
                 case 5: case 6: case 7: case 8: rc = -2; break;
+                case 9:  rc = hkdf(&v, out, &n); break;
+                case 10: rc = pbkdf2(&v, out, &n); break;
             }
             free(v.blob);
         }

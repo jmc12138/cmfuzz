@@ -20,6 +20,8 @@
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/kdf.h>
+#include <openssl/core_names.h>
 #include "compute_common.h"
 
 /* -------- deterministic PRNG (splitmix64) for reproducible vectors -------- */
@@ -71,6 +73,29 @@ static int ref_aead(const EVP_CIPHER *ci, const cmf_vec_t *v, uint8_t *o, size_t
     EVP_CIPHER_CTX_free(c);
     *n = (size_t)cl; return 0;
 }
+static int ref_hkdf(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    EVP_KDF *k = EVP_KDF_fetch(NULL, "HKDF", NULL);
+    if (!k) return -1;
+    EVP_KDF_CTX *c = EVP_KDF_CTX_new(k);
+    EVP_KDF_free(k);
+    if (!c) return -1;
+    OSSL_PARAM p[5]; int i = 0;
+    p[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, "SHA256", 0);
+    p[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, (void *)v->msg, v->msglen);
+    p[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, (void *)v->key, CMF_KEYLEN);
+    p[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, (void *)v->aad, v->aadlen);
+    p[i]   = OSSL_PARAM_construct_end();
+    int ok = EVP_KDF_derive(c, o, CMF_HKDF_OUTLEN, p);
+    EVP_KDF_CTX_free(c);
+    if (ok <= 0) return -1;
+    *n = CMF_HKDF_OUTLEN; return 0;
+}
+static int ref_pbkdf2(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    if (!PKCS5_PBKDF2_HMAC((const char *)v->msg, (int)v->msglen,
+                           v->key, CMF_KEYLEN, CMF_PBKDF2_ITER,
+                           EVP_sha256(), CMF_PBKDF2_DKLEN, o)) return -1;
+    *n = CMF_PBKDF2_DKLEN; return 0;
+}
 static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     switch (v->op) {
         case 0: return ref_digest(EVP_sha256(), v, o, n);
@@ -82,11 +107,13 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
         case 6: return ref_digest(EVP_sha3_512(), v, o, n);
         case 7: return ref_xof(EVP_shake128(), v, o, 32, n);
         case 8: return ref_xof(EVP_shake256(), v, o, 64, n);
+        case 9: return ref_hkdf(v, o, n);
+        case 10: return ref_pbkdf2(v, o, n);
     }
     return -1;
 }
 
-#define CMF_NUM_OPS 9   /* ops 0..8 (see compute_common.h) */
+#define CMF_NUM_OPS 11   /* ops 0..10 (see compute_common.h) */
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
@@ -114,7 +141,7 @@ int main(int argc, char **argv) {
     for (long i = 0; i < N; i++) {
         int op = (int)(rnd() % CMF_NUM_OPS);
         size_t msglen = rnd() % 512;
-        size_t aadlen = (op == 3 || op == 4) ? (rnd() % 64) : 0;
+        size_t aadlen = (op == 3 || op == 4 || op == 9) ? (rnd() % 64) : 0;
         size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + aadlen + msglen;
         uint8_t *blob = malloc(need);
         rnd_bytes(blob, CMF_KEYLEN + CMF_NONCELEN);

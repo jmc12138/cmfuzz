@@ -18,6 +18,8 @@
  *             3 ChaCha20-Poly1305(IETF)  4 AES-256-GCM
  *             5 SHA3-256  6 SHA3-512
  *             7 SHAKE128 (32-byte squeeze)  8 SHAKE256 (64-byte squeeze)
+ *             9  HKDF-SHA256   (IKM=msg, salt=key, info=aad, 42-byte output)
+ *             10 PBKDF2-HMAC-SHA256 (password=msg, salt=key, 4096 iters, 32B)
  *
  * Unused fields are ignored per op (hashes ignore key/nonce/aad; HMAC uses key
  * + msg; AEAD uses everything). Fixing the layout keeps one parser on both
@@ -34,6 +36,11 @@
 #define CMF_KEYLEN   32
 #define CMF_NONCELEN 12
 #define CMF_TAGLEN   16
+
+/* KDF differential parameters (ops 9/10) — fixed so agreement is by construction. */
+#define CMF_HKDF_OUTLEN   42
+#define CMF_PBKDF2_ITER   4096
+#define CMF_PBKDF2_DKLEN  32
 
 typedef struct {
     int      op;

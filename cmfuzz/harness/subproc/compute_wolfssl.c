@@ -17,7 +17,19 @@
 #include <wolfssl/wolfcrypt/chacha20_poly1305.h>
 #include <wolfssl/wolfcrypt/aes.h>
 #include <wolfssl/wolfcrypt/sha3.h>
+#include <wolfssl/wolfcrypt/pwdbased.h>
 #include "compute_common.h"
+
+static int hkdf(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (wc_HKDF(WC_SHA256, v->msg, (word32)v->msglen, v->key, CMF_KEYLEN,
+                v->aad, (word32)v->aadlen, out, CMF_HKDF_OUTLEN) != 0) return -1;
+    *n = CMF_HKDF_OUTLEN; return 0;
+}
+static int pbkdf2(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (wc_PBKDF2(out, v->msg, (int)v->msglen, v->key, CMF_KEYLEN,
+                  CMF_PBKDF2_ITER, CMF_PBKDF2_DKLEN, WC_SHA256) != 0) return -1;
+    *n = CMF_PBKDF2_DKLEN; return 0;
+}
 
 static int sha256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     if (wc_Sha256Hash(v->msg, (word32)v->msglen, out) != 0) return -1;
@@ -112,6 +124,8 @@ int main(void) {
                 case 6: rc = sha3_512(&v, out, &n); break;
                 case 7: rc = shake128(&v, out, &n); break;
                 case 8: rc = shake256(&v, out, &n); break;
+                case 9:  rc = hkdf(&v, out, &n); break;
+                case 10: rc = pbkdf2(&v, out, &n); break;
             }
             free(v.blob);
         }

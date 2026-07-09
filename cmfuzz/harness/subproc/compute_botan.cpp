@@ -14,7 +14,31 @@
 #include "botan_all.h"    /* Botan amalgamation (built by scripts/build_botan.sh) */
 #include <vector>
 #include <memory>
+#include <span>
 #include "compute_common.h"
+
+static int hkdf(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    auto kdf = Botan::KDF::create("HKDF(SHA-256)");
+    if (!kdf) return -1;
+    /* Botan HKDF: secret=IKM(msg), salt=key, label=info(aad). */
+    kdf->derive_key(std::span<uint8_t>(out, CMF_HKDF_OUTLEN),
+                    std::span<const uint8_t>(v->msg, v->msglen),
+                    std::span<const uint8_t>(v->key, CMF_KEYLEN),
+                    std::span<const uint8_t>(v->aad, v->aadlen));
+    *n = CMF_HKDF_OUTLEN;
+    return 0;
+}
+
+static int pbkdf2(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    auto fam = Botan::PasswordHashFamily::create("PBKDF2(SHA-256)");
+    if (!fam) return -1;
+    auto ph = fam->from_iterations(CMF_PBKDF2_ITER);
+    ph->derive_key(out, CMF_PBKDF2_DKLEN,
+                   reinterpret_cast<const char *>(v->msg), v->msglen,
+                   v->key, CMF_KEYLEN);
+    *n = CMF_PBKDF2_DKLEN;
+    return 0;
+}
 
 static int digest(const char *name, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     auto h = Botan::HashFunction::create(name);
@@ -68,6 +92,8 @@ int main(void) {
                     case 6: rc = digest("SHA-3(512)", &v, out, &n); break;
                     case 7: rc = digest("SHAKE-128(256)", &v, out, &n); break;
                     case 8: rc = digest("SHAKE-256(512)", &v, out, &n); break;
+                    case 9:  rc = hkdf(&v, out, &n); break;
+                    case 10: rc = pbkdf2(&v, out, &n); break;
                 }
             } catch (...) { rc = -1; }
             free(v.blob);
