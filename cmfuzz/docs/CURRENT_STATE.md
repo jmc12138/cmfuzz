@@ -6,7 +6,8 @@
 
 ## 0. 一句话现状
 在一个**小而扎实**的测试集上，三支柱（规格+oracle / 功能+常量时间双检测 / PQC·FHE·多库差分）
-端到端跑通：**6 个实现库 × 5 类原语 + PQC(262 规格) + FHE**，0 误报，且有故障注入自测证明 oracle 有效。
+端到端跑通：**7 个实现库 × 5 类原语 + PQC(262 规格) + FHE**，0 误报，且有故障注入自测证明 oracle 有效。
+BoringSSL 因与 OpenSSL 符号冲突，走**独立子进程差分**（主控 OpenSSL 做参照）。
 
 ---
 
@@ -20,6 +21,7 @@
 | Crypto++ | 8.9.0 | C++ | `libs/cryptopp/libcryptopp.a` | 传统算法差分 |
 | liboqs | 0.16.0-rc1 | C | `libs/liboqs/build/lib/liboqs.a` | PQC KEM/签名 |
 | Microsoft SEAL | 4.3.3 | C++ | `libs/SEAL/build/lib/libseal-4.3.a` | FHE(BFV) |
+| BoringSSL | rolling (`e748fac`, 2026-07-09) | C/C++ | `libs/boringssl/build/libcrypto.a` | 子进程差分 + L3 EVP_AEAD 误用靶 |
 
 ---
 
@@ -154,6 +156,23 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
   触碰上下文；故障注入在 free 后继续 `EncryptUpdate` → 有状态 API 误用
   （把 O4 内存安全并入 L3 序列层）。
 
+### 2.11 阶段 2.1 —— 子进程差分扩库（BoringSSL）+ 专属 L3 误用靶【新】
+PLAN 2.1 起把差分从 4 库扩到更多库。BoringSSL/aws-lc 重定义 OpenSSL 符号，**无法同进程链接**，
+故采用**独立子进程靶**架构（`harness/subproc/`）：
+
+- `diff_subproc`（主控，链接 OpenSSL 作参照）按行协议把 5 类原语的测试向量喂给每个后端
+  子进程，逐字节比对（O1 差分）。协议见 `compute_common.h`（key‖nonce‖aadlen‖aad‖msg，
+  两端共用一份解析器，一致性由构造保证）。
+- `compute_boringssl`（独立 CLI，**只链接 BoringSSL**）：SHA-256/512、HMAC-SHA256、
+  ChaCha20-Poly1305、AES-256-GCM。AEAD 用 BoringSSL 的一次性 **EVP_AEAD** API。
+  实测 **5000 向量对 OpenSSL 全部一致**；`CMF_DIFF_FAULT` 变体翻转输出 → 主控正确报
+  `DIFF_mismatch`（差分自测有效）。
+- `seq_boringssl`（BoringSSL 专属 **L3 误用靶**，libFuzzer+ASan，~8.5M runs/15s，**0 违反**）：
+  针对 BoringSSL 独有的 EVP_AEAD 一次性 seal/open 状态机——
+  - **O6-nonce-uniqueness**：GCM(EVP_AEAD) 同 (key,nonce) 重用 → `ct1⊕ct2==m1⊕m2` 密钥流泄露；
+  - **O6-release-before-verify**：`EVP_AEAD_CTX_open()` 对伪造密文返回 0，契约要求仅在返回 1
+    时使用输出；对篡改密文仍交付明文即违反。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -162,8 +181,8 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
 |---|---|---|
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
 | **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
-| **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商；AES-256-CBC：可预测/复用 IV；EVP 上下文 use-after-free | ✅ |
-| 差分 | 同算法跨 4 库输出一致性 | ✅ |
+| **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商；AES-256-CBC：可预测/复用 IV；EVP 上下文 use-after-free；**BoringSSL EVP_AEAD：nonce 复用、release-before-verify** | ✅ |
+| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL 独立子进程差分**（`diff_subproc`，5 算法 vs OpenSSL 一致） | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
 
@@ -181,7 +200,9 @@ L3 测**操作序列**是否遵守库的使用契约（首个 O6 靶，传统 AE
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **15/15**（含差分；无差分库时 14/14）：故障注入使以下 oracle 全部正确触发——
+`tests/negative_tests.sh` ✅ **18/18**（含差分库 + BoringSSL；仅差分库 15；最小 14）：
+新增 **L3 BoringSSL EVP_AEAD nonce 复用 / release-before-verify**、**子进程差分 DIFF_mismatch**
+三项（仅在 BoringSSL 已编时运行，否则 SKIP）。故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
 **L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
 **L2 TLS1.3 seq 绑定(O5-seq-binding)**、**L2 认证 KEM transcript 绑定(O5-transcript-binding)**、
@@ -205,6 +226,13 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（夜·1）：**PLAN 阶段2.1（差分扩库·第一个库 BoringSSL）** —— 新增
+  **子进程差分框架** `harness/subproc/`（`diff_subproc` 主控 + `compute_boringssl` CLI）：
+  BoringSSL 因符号冲突走独立子进程，5 类原语对 OpenSSL **5000 向量全一致**；并新增
+  **BoringSSL 专属 L3 误用靶** `seq_boringssl`（EVP_AEAD：O6-nonce-uniqueness +
+  O6-release-before-verify，8.5M runs 0 违反）。负向自测升到 **18/18**（新增两条 BoringSSL
+  L3 + 子进程 DIFF_mismatch）。新增 `scripts/build_boringssl.sh`、`scripts/build_subproc.sh`
+  （已接入 `build_all.sh`，缺 Go 时自动跳过）。本阶段 0 新发现。
 - 2026-07-09（晚·3）：**PLAN 阶段1.4 补齐** —— 新增 **L3 EVP 状态机 harness**
   (`seq_evp_harness.c`，O6)：AES-256-CBC 可预测/复用 IV（O6-iv-unpredictability）、
   EVP 上下文 use-after-free（O6-ctx-use-after-free），补齐 PLAN 1.4 本来列出但 seq_aead

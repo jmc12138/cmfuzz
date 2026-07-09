@@ -1,0 +1,166 @@
+/*
+ * CMFuzz subprocess differential runner (stage 2.1).
+ *
+ * Reference implementation = in-process OpenSSL. Each extra backend
+ * (BoringSSL / aws-lc / wolfCrypt / Botan) is a standalone compute CLI driven
+ * as a batched child process (see compute_common.h). This sidesteps the
+ * OpenSSL-symbol collisions that make in-process linking impossible, while
+ * still giving a byte-exact O1 differential across libraries.
+ *
+ * Usage:  diff_subproc_runner <n> <seed> <name=path> [<name=path> ...]
+ *   Generates <n> deterministic random test vectors (5 primitives), computes
+ *   the OpenSSL reference for each, then feeds all requests to every backend
+ *   and checks the backend agrees byte-for-byte. Any divergence prints a
+ *   CMF_VIOLATION line and exits non-zero (so it doubles as a self-test when a
+ *   fault-injected CLI is passed).
+ */
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include "compute_common.h"
+
+/* -------- deterministic PRNG (splitmix64) for reproducible vectors -------- */
+static uint64_t g_state;
+static uint64_t rnd(void) {
+    uint64_t z = (g_state += 0x9E3779B97F4A7C15ULL);
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    return z ^ (z >> 31);
+}
+static void rnd_bytes(uint8_t *b, size_t n) {
+    for (size_t i = 0; i < n; i++) b[i] = (uint8_t)(rnd() & 0xFF);
+}
+
+/* ------------------------- OpenSSL reference ------------------------- */
+static int ref_digest(const EVP_MD *md, const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    unsigned int ol = 0;
+    if (!EVP_Digest(v->msg, v->msglen, o, &ol, md, NULL)) return -1;
+    *n = ol; return 0;
+}
+static int ref_hmac(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    unsigned int ol = 0;
+    if (!HMAC(EVP_sha256(), v->key, CMF_KEYLEN, v->msg, v->msglen, o, &ol)) return -1;
+    *n = ol; return 0;
+}
+static int ref_aead(const EVP_CIPHER *ci, const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    int len = 0, cl = 0;
+    EVP_CIPHER_CTX *c = EVP_CIPHER_CTX_new();
+    if (!c) return -1;
+    EVP_EncryptInit_ex(c, ci, NULL, NULL, NULL);
+    EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_SET_IVLEN, CMF_NONCELEN, NULL);
+    EVP_EncryptInit_ex(c, NULL, NULL, v->key, v->nonce);
+    if (v->aadlen) EVP_EncryptUpdate(c, NULL, &len, v->aad, (int)v->aadlen);
+    EVP_EncryptUpdate(c, o, &len, v->msg, (int)v->msglen); cl = len;
+    EVP_EncryptFinal_ex(c, o + cl, &len); cl += len;
+    EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_GET_TAG, CMF_TAGLEN, o + cl); cl += CMF_TAGLEN;
+    EVP_CIPHER_CTX_free(c);
+    *n = (size_t)cl; return 0;
+}
+static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    switch (v->op) {
+        case 0: return ref_digest(EVP_sha256(), v, o, n);
+        case 1: return ref_digest(EVP_sha512(), v, o, n);
+        case 2: return ref_hmac(v, o, n);
+        case 3: return ref_aead(EVP_chacha20_poly1305(), v, o, n);
+        case 4: return ref_aead(EVP_aes_256_gcm(), v, o, n);
+    }
+    return -1;
+}
+
+static const char *HEX = "0123456789abcdef";
+static void tohex(const uint8_t *b, size_t n, char *out) {
+    for (size_t i = 0; i < n; i++) { out[2*i] = HEX[b[i]>>4]; out[2*i+1] = HEX[b[i]&15]; }
+    out[2*n] = '\0';
+}
+
+int main(int argc, char **argv) {
+    if (argc < 4) {
+        fprintf(stderr, "usage: %s <n> <seed> <name=path> [<name=path>...]\n", argv[0]);
+        return 2;
+    }
+    long N = atol(argv[1]);
+    g_state = strtoull(argv[2], NULL, 0);
+
+    /* Build all request lines + cache the OpenSSL reference outputs. */
+    char *reqpath = strdup("/tmp/cmf_diff_req_XXXXXX");
+    int rfd = mkstemp(reqpath);
+    if (rfd < 0) { perror("mkstemp"); return 2; }
+    FILE *rf = fdopen(rfd, "w");
+
+    char (*refhex)[8300] = malloc((size_t)N * sizeof *refhex);
+    if (!refhex) { fprintf(stderr, "oom\n"); return 2; }
+
+    for (long i = 0; i < N; i++) {
+        int op = (int)(rnd() % 5);
+        size_t msglen = rnd() % 512;
+        size_t aadlen = (op >= 3) ? (rnd() % 64) : 0;
+        size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + aadlen + msglen;
+        uint8_t *blob = malloc(need);
+        rnd_bytes(blob, CMF_KEYLEN + CMF_NONCELEN);
+        blob[CMF_KEYLEN + CMF_NONCELEN]     = (uint8_t)(aadlen >> 8);
+        blob[CMF_KEYLEN + CMF_NONCELEN + 1] = (uint8_t)(aadlen & 0xFF);
+        rnd_bytes(blob + CMF_KEYLEN + CMF_NONCELEN + 2, aadlen + msglen);
+
+        /* request line: "<op> <hex-of-blob>\n" */
+        fprintf(rf, "%d ", op);
+        for (size_t j = 0; j < need; j++) fprintf(rf, "%c%c", HEX[blob[j]>>4], HEX[blob[j]&15]);
+        fputc('\n', rf);
+
+        /* parse the blob back into fields exactly as the CLI will, then ref-compute */
+        cmf_vec_t v; memset(&v, 0, sizeof v);
+        v.op = op;
+        memcpy(v.key, blob, CMF_KEYLEN);
+        memcpy(v.nonce, blob + CMF_KEYLEN, CMF_NONCELEN);
+        v.aad = blob + CMF_KEYLEN + CMF_NONCELEN + 2; v.aadlen = aadlen;
+        v.msg = v.aad + aadlen; v.msglen = msglen;
+        uint8_t o[8192]; size_t on = 0;
+        if (ref_compute(&v, o, &on) != 0) { strcpy(refhex[i], "ERR"); }
+        else tohex(o, on, refhex[i]);
+        free(blob);
+    }
+    fclose(rf);
+
+    int failures = 0;
+    for (int a = 3; a < argc; a++) {
+        char *eq = strchr(argv[a], '=');
+        if (!eq) { fprintf(stderr, "bad backend spec: %s\n", argv[a]); return 2; }
+        *eq = '\0';
+        const char *name = argv[a], *path = eq + 1;
+
+        char cmd[1024];
+        snprintf(cmd, sizeof cmd, "'%s' < '%s'", path, reqpath);
+        FILE *p = popen(cmd, "r");
+        if (!p) { fprintf(stderr, "popen failed for %s\n", name); return 2; }
+
+        char *line = NULL; size_t cap = 0; long i = 0; int mism = 0;
+        while (i < N && getline(&line, &cap, p) > 0) {
+            size_t ll = strlen(line);
+            while (ll && (line[ll-1]=='\n' || line[ll-1]=='\r')) line[--ll] = '\0';
+            if (strcmp(line, refhex[i]) != 0) {
+                char msg[160];
+                snprintf(msg, sizeof msg, "openssl vs %s disagree at vec #%ld (op-seeded)", name, i);
+                fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=DIFF_mismatch detail=\"%s\"\n", msg);
+                fprintf(stderr, "  openssl=%.64s...\n  %s=%.64s...\n", refhex[i], name, line);
+                mism = 1; failures++;
+                break;
+            }
+            i++;
+        }
+        pclose(p);
+        free(line);
+        if (!mism && i < N)
+            { fprintf(stderr, "backend %s produced only %ld/%ld outputs\n", name, i, N); failures++; }
+        else if (!mism)
+            fprintf(stderr, "[diff-subproc] %s agrees on %ld vectors\n", name, N);
+    }
+
+    remove(reqpath);
+    free(reqpath);
+    free(refhex);
+    if (failures) { fprintf(stderr, "[diff-subproc] %d backend(s) diverged\n", failures); return 1; }
+    fprintf(stderr, "[diff-subproc] all backends agree\n");
+    return 0;
+}

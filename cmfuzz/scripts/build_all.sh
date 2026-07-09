@@ -54,4 +54,7 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 if bash "$ROOT/scripts/build_diff_libs.sh"; then
   bash "$ROOT/scripts/build_diff_harness.sh" || echo "[build_all] diff harness skipped"
 fi
+# Stage 2.1 subprocess differential (BoringSSL). Optional: needs Go to build
+# BoringSSL, so a minimal setup without Go still succeeds.
+bash "$ROOT/scripts/build_subproc.sh" || echo "[build_all] subprocess diff skipped (BoringSSL/Go missing)"
 echo "[build_all] done"

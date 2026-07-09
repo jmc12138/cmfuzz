@@ -86,6 +86,34 @@ else
   echo "SKIP  differential self-test (extra libs not built; run scripts/build_diff_libs.sh)"
 fi
 
+# Stage 2.1 subprocess differential + BoringSSL L3 self-tests (only if BoringSSL built).
+BSSL_A="$(find "$ROOT/libs/boringssl/build" -name libcrypto.a 2>/dev/null | head -1)"
+if [ -n "$BSSL_A" ]; then
+  BINC="-I$ROOT/libs/boringssl/include"; BSAN="-fsanitize=address,fuzzer -g -O1"
+  SUB="$ROOT/harness/subproc"
+  echo "[neg] building BoringSSL fault-injected L3 harnesses..."
+  clang $BSAN $BINC -DCMF_FAULT_NONCE=1 -c "$SUB/seq_boringssl_harness.c" -o "$TMP/sbn.o"
+  clang++ $BSAN "$TMP/sbn.o" "$BSSL_A" -lpthread -o "$TMP/bssl_nonce" 2>/dev/null
+  clang $BSAN $BINC -DCMF_FAULT_RELEASE=1 -c "$SUB/seq_boringssl_harness.c" -o "$TMP/sbr.o"
+  clang++ $BSAN "$TMP/sbr.o" "$BSSL_A" -lpthread -o "$TMP/bssl_release" 2>/dev/null
+  check "L3 BoringSSL EVP_AEAD detects nonce reuse"            "$TMP/bssl_nonce" "O6-nonce-uniqueness"
+  check "L3 BoringSSL EVP_AEAD detects release-before-verify"  "$TMP/bssl_release" "O6-release-before-verify"
+
+  echo "[neg] building subprocess differential self-test..."
+  clang -g -O1 "$SUB/diff_subproc_runner.c" -I"$SUB" -lcrypto -o "$TMP/diff_subproc"
+  clang -g -O1 -DCMF_DIFF_FAULT=1 -c "$SUB/compute_boringssl.c" $BINC -I"$SUB" -o "$TMP/cbf.o"
+  clang++ -g -O1 "$TMP/cbf.o" "$BSSL_A" -lpthread -o "$TMP/compute_bssl_fault" 2>/dev/null
+  "$TMP/diff_subproc" 200 12345 boringssl_fault="$TMP/compute_bssl_fault" > "$TMP/subout.txt" 2>&1 || true
+  cat "$TMP/subout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/subout.txt"; then
+    echo "PASS  Subprocess differential detects divergent BoringSSL backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Subprocess differential (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  BoringSSL subprocess self-tests (BoringSSL not built; run scripts/build_boringssl.sh — needs Go)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

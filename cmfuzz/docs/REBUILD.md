@@ -32,7 +32,11 @@ keep it small/fast. Build them on demand inside the container:
 bash scripts/build_seal.sh        # FHE harness (heavy C++ build)
 bash scripts/build_diff_libs.sh   # differential libs, then:
 bash scripts/build_diff_harness.sh
+bash scripts/build_subproc.sh     # stage-2.1 BoringSSL subprocess differential + L3 harness (needs Go)
 ```
+
+The image preinstalls `golang-go`, so `build_subproc.sh` (which clones + builds
+BoringSSL) works on demand inside the container.
 
 ---
 
@@ -45,6 +49,8 @@ sudo apt-get update
 sudo apt-get install -y clang cmake ninja-build libssl-dev git python3
 # optional (only for the differential libs):
 sudo apt-get install -y build-essential autoconf automake libtool pkg-config
+# optional (only for the BoringSSL subprocess differential, stage 2.1):
+sudo apt-get install -y golang-go
 ```
 
 Versions known-good: **clang 14**, **cmake 3.22**, **ninja 1.10**, **OpenSSL/libssl-dev 3.0.2**.
@@ -66,8 +72,10 @@ bash scripts/build_harness.sh     # liboqs KEM/SIG harnesses
 ```
 
 `scripts/build_all.sh` does everything (liboqs + specs + all harnesses + SEAL +
-diff libs) in one shot, but it builds SEAL under `set -e`; if you don't want the
-heavy SEAL build, build the pieces individually or use the Docker image.
+diff libs + BoringSSL subprocess stack) in one shot, but it builds SEAL under
+`set -e`; if you don't want the heavy SEAL build, build the pieces individually or
+use the Docker image. The BoringSSL step (`build_subproc.sh`) is optional and
+skips gracefully if Go is missing.
 
 ### 4. Verify
 
@@ -92,9 +100,14 @@ timeout 60 ./build/harness/comp_hpke_mlkem -max_total_time=60 -print_final_stats
 
 ## Gotchas
 
-- **liboqs / SEAL / the diff libs are not in git** — they are cloned by their build
-  scripts (`build_liboqs.sh`, `build_seal.sh`, and `build_diff_libs.sh` which pins
-  libsodium 1.0.20 / mbedtls-3.6.2 / cryptopp 8.9.0). First build needs network access.
+- **liboqs / SEAL / the diff libs / BoringSSL are not in git** — they are cloned by
+  their build scripts (`build_liboqs.sh`, `build_seal.sh`, `build_diff_libs.sh`
+  which pins libsodium 1.0.20 / mbedtls-3.6.2 / cryptopp 8.9.0, and
+  `build_boringssl.sh`). First build needs network access.
+- **BoringSSL needs Go and links with `clang++`** — its static `libcrypto.a`
+  contains C++ objects, so its consumers (the compute CLI + L3 harness) must be
+  *linked* with `clang++` even though the sources are C. `build_subproc.sh`
+  handles this; see it for the exact commands.
 - **Debug build of liboqs** is intentional: ASan/UBSan traces are useless without
   frame info. Don't switch it to Release "for speed".
 - **Optional libs skip gracefully**: `build_all.sh` and `negative_tests.sh` detect

@@ -12,10 +12,12 @@
 #   Tests:  docker run --rm cmfuzz bash tests/negative_tests.sh   # expect: all passed
 #
 # liboqs is cloned + built *inside* the image (it is gitignored and not shipped
-# in the repo). The optional differential libs (libsodium/mbedtls/crypto++) and
-# Microsoft SEAL are NOT built here to keep the image small/fast; run
-# scripts/build_diff_libs.sh + scripts/build_seal.sh inside the container if you
-# need the differential (O1) or FHE harnesses.
+# in the repo). The optional differential libs (libsodium/mbedtls/crypto++),
+# Microsoft SEAL, and BoringSSL (stage-2.1 subprocess differential) are NOT built
+# here to keep the image small/fast; run scripts/build_diff_libs.sh,
+# scripts/build_seal.sh, or scripts/build_subproc.sh inside the container if you
+# need the differential (O1), FHE, or BoringSSL harnesses. Go is preinstalled so
+# build_subproc.sh (which builds BoringSSL) works on demand.
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -39,6 +41,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         automake \
         libtool \
         pkg-config \
+        golang-go \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/cmfuzz
