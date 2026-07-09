@@ -23,6 +23,9 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
   -DCMF_HPKE_KEM=1 -I"$ROOT/libs/liboqs/build/include" "$ROOT/harness/comp_hpke_harness.c" \
   "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$ROOT/build/harness/comp_hpke_mlkem"
+# L2 traditional composition: Encrypt-then-MAC (AES-CBC+HMAC) + TLS1.3-style record layer
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  "$ROOT/harness/comp_trad_harness.c" -lcrypto -o "$ROOT/build/harness/comp_trad"
 # Extra libraries + multi-library differential harness (optional; skipped if the
 # extra libs failed to build so a minimal setup still succeeds).
 if bash "$ROOT/scripts/build_diff_libs.sh"; then

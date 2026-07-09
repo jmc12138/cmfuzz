@@ -90,6 +90,17 @@
 - **O5-upstream-tamper**：篡改封装密钥 `enc` → 接收端派生出不同共享密钥 → open 必须失败。
   这正是"单原语(L1)可能判为良性 feature 的可锻造性，在组合层暴露为端到端失败"的体现。
 
+### 2.6 L2 组合层 —— 传统通用组合（Encrypt-then-MAC / TLS1.3 记录层）【新】
+靶：`build/harness/comp_trad`（~7.2M runs/90s，**0 违反**）。证明 L2 组合层对**传统算法**同样适用。
+
+- **Encrypt-then-MAC (EtM)** = AES-256-CBC 加密 + HMAC-SHA256(iv‖ct)（可证明安全的通用组合）：
+  - **O5-roundtrip**：先验 MAC 再解密，`open(seal(m))==m`；
+  - **O5-ciphertext-integrity**：翻转 iv/ct/tag 任一位 → open 必须拒绝（解密前先拒）。
+- **TLS1.3 记录层** = AES-256-GCM，nonce=static_iv⊕seq，记录头作 AAD：
+  - **O5-roundtrip**：`open(seq, seal(seq,m))==m`；
+  - **O5-seq-binding**：用错误 seq 打开 → 必须失败（顺序/nonce 绑定）；
+  - **O5-tamper**：翻转 ct/tag → 必须失败。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -97,7 +108,7 @@
 | 类型 | 内容 | 状态 |
 |---|---|---|
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
-| **L2 组合(O5)** | HPKE 往返 / 上下文绑定 / 上游篡改放大（X25519 + ML-KEM-768） | ✅ |
+| **L2 组合(O5)** | HPKE 往返/上下文绑定/上游篡改（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定/篡改 | ✅ |
 | 差分 | 同算法跨 4 库输出一致性 | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
@@ -116,9 +127,10 @@
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **5/5**：故障注入使以下 oracle 全部正确触发——
+`tests/negative_tests.sh` ✅ **7/7**：故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
-**L2 HPKE 组合上游篡改(O5-upstream-tamper)**、多库差分(DIFF_mismatch)。
+**L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
+**L2 TLS1.3 记录层 seq 绑定(O5-seq-binding)**、多库差分(DIFF_mismatch)。
 
 ---
 
@@ -134,6 +146,10 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（傍晚·2）：**PLAN 阶段1.2** —— 新增 **L2 传统组合 harness**
+  (`harness/comp_trad_harness.c`)：Encrypt-then-MAC(AES-CBC+HMAC) 密文完整性、
+  TLS1.3 记录层(AES-GCM, seq nonce) 往返/seq 绑定/篡改。campaign 7.2M runs 0 违反；
+  负向自测升到 **7/7**（新增 EtM 完整性、记录层 seq 绑定两个故障注入）。本阶段 0 新发现。
 - 2026-07-09（傍晚）：**PLAN 阶段1.1** —— 新增 **L2 组合层 HPKE harness**
   (`harness/comp_hpke_harness.c`，X25519 + ML-KEM-768 两后端)，组合不变量 oracle O5
   （往返 / 上下文绑定 / 上游篡改放大）。两靶 campaign 0 违反；负向自测升到 **5/5**。
