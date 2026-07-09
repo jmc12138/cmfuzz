@@ -16,6 +16,7 @@
 #include <wolfssl/wolfcrypt/hmac.h>
 #include <wolfssl/wolfcrypt/chacha20_poly1305.h>
 #include <wolfssl/wolfcrypt/aes.h>
+#include <wolfssl/wolfcrypt/sha3.h>
 #include "compute_common.h"
 
 static int sha256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
@@ -26,6 +27,36 @@ static int sha256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
 static int sha512(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     if (wc_Sha512Hash(v->msg, (word32)v->msglen, out) != 0) return -1;
     *n = 64; return 0;
+}
+
+static int sha3_256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (wc_Sha3_256Hash(v->msg, (word32)v->msglen, out) != 0) return -1;
+    *n = 32; return 0;
+}
+
+static int sha3_512(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    if (wc_Sha3_512Hash(v->msg, (word32)v->msglen, out) != 0) return -1;
+    *n = 64; return 0;
+}
+
+static int shake128(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    wc_Shake sk;
+    if (wc_InitShake128(&sk, NULL, INVALID_DEVID) != 0) return -1;
+    int rc = -1;
+    if (wc_Shake128_Update(&sk, v->msg, (word32)v->msglen) == 0 &&
+        wc_Shake128_Final(&sk, out, 32) == 0) { *n = 32; rc = 0; }
+    wc_Shake128_Free(&sk);
+    return rc;
+}
+
+static int shake256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    wc_Shake sk;
+    if (wc_InitShake256(&sk, NULL, INVALID_DEVID) != 0) return -1;
+    int rc = -1;
+    if (wc_Shake256_Update(&sk, v->msg, (word32)v->msglen) == 0 &&
+        wc_Shake256_Final(&sk, out, 64) == 0) { *n = 64; rc = 0; }
+    wc_Shake256_Free(&sk);
+    return rc;
 }
 
 static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
@@ -77,6 +108,10 @@ int main(void) {
                 case 2: rc = hmac256(&v, out, &n); break;
                 case 3: rc = chachapoly(&v, out, &n); break;
                 case 4: rc = aesgcm(&v, out, &n); break;
+                case 5: rc = sha3_256(&v, out, &n); break;
+                case 6: rc = sha3_512(&v, out, &n); break;
+                case 7: rc = shake128(&v, out, &n); break;
+                case 8: rc = shake256(&v, out, &n); break;
             }
             free(v.blob);
         }

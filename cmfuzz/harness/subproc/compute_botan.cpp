@@ -63,6 +63,11 @@ int main(void) {
                     case 2: rc = hmac256(&v, out, &n); break;
                     case 3: rc = aead("ChaCha20Poly1305", &v, out, &n); break;
                     case 4: rc = aead("AES-256/GCM", &v, out, &n); break;
+                    /* Botan hash names encode the output length in bits. */
+                    case 5: rc = digest("SHA-3(256)", &v, out, &n); break;
+                    case 6: rc = digest("SHA-3(512)", &v, out, &n); break;
+                    case 7: rc = digest("SHAKE-128(256)", &v, out, &n); break;
+                    case 8: rc = digest("SHAKE-256(512)", &v, out, &n); break;
                 }
             } catch (...) { rc = -1; }
             free(v.blob);

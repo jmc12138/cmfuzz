@@ -11,9 +11,13 @@
  *   request : "<op> <hex>\n"   where hex = key(32) || nonce(12) ||
  *                              aadlen(2, big-endian) || aad || msg
  *   reply   : "<hex-output>\n" (digest, or ciphertext||tag for AEAD);
- *             "ERR\n" if the backend could not compute it.
+ *             "ERR\n" if the backend could not compute it;
+ *             "NA\n"  if the backend does not implement this op (the runner
+ *                     then skips it for that backend — not a divergence).
  *   ops     : 0 SHA-256  1 SHA-512  2 HMAC-SHA256
  *             3 ChaCha20-Poly1305(IETF)  4 AES-256-GCM
+ *             5 SHA3-256  6 SHA3-512
+ *             7 SHAKE128 (32-byte squeeze)  8 SHAKE256 (64-byte squeeze)
  *
  * Unused fields are ignored per op (hashes ignore key/nonce/aad; HMAC uses key
  * + msg; AEAD uses everything). Fixing the layout keeps one parser on both

@@ -51,9 +51,12 @@ int main(void) {
                 case 2: rc = hmac256(&v, out, &n); break;
                 case 3: rc = aead(EVP_aead_chacha20_poly1305(), &v, out, &n); break;
                 case 4: rc = aead(EVP_aead_aes_256_gcm(), &v, out, &n); break;
+                /* This BoringSSL build exposes no SHA-3/SHAKE via EVP. */
+                case 5: case 6: case 7: case 8: rc = -2; break;
             }
             free(v.blob);
         }
+        if (rc == -2) { printf("NA\n"); fflush(stdout); continue; }
         if (rc != 0) { printf("ERR\n"); fflush(stdout); continue; }
 #ifdef CMF_DIFF_FAULT
         if (n) out[0] ^= 0xFF;   /* self-test: force a divergence */

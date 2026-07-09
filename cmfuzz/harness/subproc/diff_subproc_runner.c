@@ -40,6 +40,18 @@ static int ref_digest(const EVP_MD *md, const cmf_vec_t *v, uint8_t *o, size_t *
     if (!EVP_Digest(v->msg, v->msglen, o, &ol, md, NULL)) return -1;
     *n = ol; return 0;
 }
+/* SHAKE is an XOF: squeeze a fixed number of bytes so the differential is
+ * well-defined (SHAKE128 -> 32 bytes, SHAKE256 -> 64 bytes). */
+static int ref_xof(const EVP_MD *md, const cmf_vec_t *v, uint8_t *o, size_t outlen, size_t *n) {
+    EVP_MD_CTX *c = EVP_MD_CTX_new();
+    if (!c) return -1;
+    int ok = EVP_DigestInit_ex(c, md, NULL) &&
+             EVP_DigestUpdate(c, v->msg, v->msglen) &&
+             EVP_DigestFinalXOF(c, o, outlen);
+    EVP_MD_CTX_free(c);
+    if (!ok) return -1;
+    *n = outlen; return 0;
+}
 static int ref_hmac(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     unsigned int ol = 0;
     if (!HMAC(EVP_sha256(), v->key, CMF_KEYLEN, v->msg, v->msglen, o, &ol)) return -1;
@@ -66,9 +78,15 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
         case 2: return ref_hmac(v, o, n);
         case 3: return ref_aead(EVP_chacha20_poly1305(), v, o, n);
         case 4: return ref_aead(EVP_aes_256_gcm(), v, o, n);
+        case 5: return ref_digest(EVP_sha3_256(), v, o, n);
+        case 6: return ref_digest(EVP_sha3_512(), v, o, n);
+        case 7: return ref_xof(EVP_shake128(), v, o, 32, n);
+        case 8: return ref_xof(EVP_shake256(), v, o, 64, n);
     }
     return -1;
 }
+
+#define CMF_NUM_OPS 9   /* ops 0..8 (see compute_common.h) */
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
@@ -94,9 +112,9 @@ int main(int argc, char **argv) {
     if (!refhex) { fprintf(stderr, "oom\n"); return 2; }
 
     for (long i = 0; i < N; i++) {
-        int op = (int)(rnd() % 5);
+        int op = (int)(rnd() % CMF_NUM_OPS);
         size_t msglen = rnd() % 512;
-        size_t aadlen = (op >= 3) ? (rnd() % 64) : 0;
+        size_t aadlen = (op == 3 || op == 4) ? (rnd() % 64) : 0;
         size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + aadlen + msglen;
         uint8_t *blob = malloc(need);
         rnd_bytes(blob, CMF_KEYLEN + CMF_NONCELEN);
@@ -139,6 +157,8 @@ int main(int argc, char **argv) {
         while (i < N && getline(&line, &cap, p) > 0) {
             size_t ll = strlen(line);
             while (ll && (line[ll-1]=='\n' || line[ll-1]=='\r')) line[--ll] = '\0';
+            /* "NA" = backend does not implement this op -> skip (not a bug). */
+            if (strcmp(line, "NA") == 0) { i++; continue; }
             if (strcmp(line, refhex[i]) != 0) {
                 char msg[160];
                 snprintf(msg, sizeof msg, "openssl vs %s disagree at vec #%ld (op-seeded)", name, i);

@@ -15,7 +15,7 @@ fi
 if [ ! -f "$BOTAN/botan_all.cpp" ]; then
   ( cd "$BOTAN" && python3 configure.py --cc=clang --amalgamation \
       --minimized-build --without-documentation \
-      --enable-modules=sha2_32,sha2_64,hmac,gcm,aes,chacha20poly1305 \
+      --enable-modules=sha2_32,sha2_64,sha3,shake,hmac,gcm,aes,chacha20poly1305 \
       >/tmp/botan_conf.log 2>&1 )
 fi
 # The amalgamation is what consumers compile against (see build_subproc.sh).

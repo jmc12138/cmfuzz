@@ -26,6 +26,18 @@ static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     *n = ol; return 0;
 }
 
+/* SHAKE XOF: squeeze a fixed number of bytes (see compute_common.h). */
+static int xof(const EVP_MD *md, const cmf_vec_t *v, uint8_t *out, size_t outlen, size_t *n) {
+    EVP_MD_CTX *c = EVP_MD_CTX_new();
+    if (!c) return -1;
+    int ok = EVP_DigestInit_ex(c, md, NULL) &&
+             EVP_DigestUpdate(c, v->msg, v->msglen) &&
+             EVP_DigestFinalXOF(c, out, outlen);
+    EVP_MD_CTX_free(c);
+    if (!ok) return -1;
+    *n = outlen; return 0;
+}
+
 static int aead(const EVP_AEAD *a, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     EVP_AEAD_CTX *c = EVP_AEAD_CTX_new(a, v->key, EVP_AEAD_key_length(a),
                                        EVP_AEAD_DEFAULT_TAG_LENGTH);
@@ -51,6 +63,10 @@ int main(void) {
                 case 2: rc = hmac256(&v, out, &n); break;
                 case 3: rc = aead(EVP_aead_chacha20_poly1305(), &v, out, &n); break;
                 case 4: rc = aead(EVP_aead_aes_256_gcm(), &v, out, &n); break;
+                case 5: rc = digest(EVP_sha3_256(), &v, out, &n); break;
+                case 6: rc = digest(EVP_sha3_512(), &v, out, &n); break;
+                case 7: rc = xof(EVP_shake128(), &v, out, 32, &n); break;
+                case 8: rc = xof(EVP_shake256(), &v, out, 64, &n); break;
             }
             free(v.blob);
         }

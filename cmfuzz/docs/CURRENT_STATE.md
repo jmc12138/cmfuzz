@@ -194,6 +194,19 @@ wolfCrypt 用自己的 wc_* API；Botan 是 C++、活在 Botan:: 命名空间。
 - `seq_botan`（Botan 专属 **L3 误用靶**，~0.33M runs/15s，**0 违反**）：针对 Botan `AEAD_Mode`
   状态机——两个 O6 oracle（nonce 唯一性；解密 `finish()` 对篡改密文**抛异常**，未成功即不得交付明文）。
 
+### 2.12 阶段 2.2 —— 差分算法扩展（SHA-3 家族）【新】
+PLAN 2.2 在既有库上加算法。第一批：**SHA-3 家族**，接入子进程差分协议为 op 5–8：
+- op5 **SHA3-256**、op6 **SHA3-512**（定长摘要）；op7 **SHAKE128**、op8 **SHAKE256**（XOF，
+  分别定长挤出 32B / 64B，使差分良定义）。
+- 各后端实现：OpenSSL 参照 = `EVP_sha3_*` / `EVP_DigestFinalXOF`；aws-lc 同 EVP API；
+  wolfCrypt = `wc_Sha3_256Hash` / `wc_Sha3_512Hash` / `wc_Shake128/256_*`；
+  Botan = `HashFunction("SHA-3(256)"/"SHAKE-128(256)")`（名字里编码输出比特数）。
+- **能力协商**：本 BoringSSL 构建未经 EVP 暴露 SHA-3/SHAKE，其 CLI 对 op5–8 回 `NA`，
+  主控**跳过该后端该 op**（非分歧）——这是让"算法支持随库不同"而不产生假阳的通用机制。
+- 实测 **OpenSSL+aws-lc+wolfCrypt+Botan 四方 5000 向量（含 SHA-3/SHAKE）全一致**，且
+  `SHA3-256("abc")` / `SHAKE128("abc",32)` 对齐 NIST 已知向量；faulted CLI 仍被 `DIFF_mismatch`
+  捕获（差分自测覆盖 op0–8）。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -247,6 +260,14 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（夜·5）：**PLAN 阶段2.2（差分算法扩展·第一批 SHA-3 家族）** —— 子进程差分
+  协议加 op5–8：**SHA3-256 / SHA3-512 / SHAKE128(32B) / SHAKE256(64B)**。四后端实现
+  （OpenSSL 参照 `EVP_sha3_*`/`EVP_DigestFinalXOF`、aws-lc 同 EVP、wolfCrypt `wc_Sha3_*Hash`/
+  `wc_Shake*`、Botan `HashFunction("SHA-3(256)"/"SHAKE-128(256)")`）。新增 **`NA` 能力协商**：
+  本 BoringSSL 构建未暴露 SHA-3 → 其 CLI 回 `NA`，主控跳过该 op（不算分歧）。**四方
+  （OpenSSL+aws-lc+wolfCrypt+Botan）5000 向量全一致**，且 `SHA3-256("abc")`/`SHAKE128("abc",32)`
+  对齐 NIST 已知向量；Botan amalgamation 加 `sha3,shake` 模块重建。负向自测仍 **27/27**
+  （DIFF_mismatch 自测已覆盖 op0–8）。本阶段 0 新发现。
 - 2026-07-09（夜·4）：**PLAN 阶段2.1（差分扩库·第四个库 Botan）** —— Botan（C++）用
   `AEAD_Mode`/`HashFunction`/`MAC` 对象状态机接入子进程差分：新增 `compute_botan` CLI +
   `seq_botan` L3 AEAD 误用靶 + `scripts/build_botan.sh`（Botan 3.8.1 amalgamation，只启用
