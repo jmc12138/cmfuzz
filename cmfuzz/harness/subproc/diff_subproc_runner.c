@@ -23,6 +23,8 @@
 #include <openssl/kdf.h>
 #include <openssl/core_names.h>
 #include <openssl/ec.h>
+#include <openssl/rsa.h>
+#include <openssl/bn.h>
 #include "compute_common.h"
 
 /* -------- deterministic PRNG (splitmix64) for reproducible vectors -------- */
@@ -159,6 +161,57 @@ static int ecdsa_make_payload(uint8_t *pl, size_t *plen, int *verdict) {
     *plen = off; return 0;
 }
 
+/* RSA-PSS verify-interop (op14): one RSA-2048 key is reused for the whole run
+ * (keygen is expensive). OpenSSL signs with RSA-PSS(SHA-256, MGF1-SHA-256,
+ * salt=32), tampers the message on ~half the vectors, and records the verdict.
+ * The verify-payload's "pubkey" field is the raw modulus n (public exponent is
+ * fixed at 65537, so it need not be transmitted). */
+static EVP_PKEY *g_rsa_key = NULL;
+static int rsa_pss_sign_or_verify(int sign, uint8_t *sig, size_t *siglen,
+                                  const uint8_t *msg, size_t mlen) {
+    EVP_MD_CTX *c = EVP_MD_CTX_new();
+    if (!c) return -1;
+    EVP_PKEY_CTX *pctx = NULL;
+    int ok;
+    if (sign)
+        ok = EVP_DigestSignInit(c, &pctx, EVP_sha256(), NULL, g_rsa_key) == 1;
+    else
+        ok = EVP_DigestVerifyInit(c, &pctx, EVP_sha256(), NULL, g_rsa_key) == 1;
+    ok = ok &&
+         EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PSS_PADDING) == 1 &&
+         EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, CMF_RSA_SALTLEN) == 1 &&
+         EVP_PKEY_CTX_set_rsa_mgf1_md(pctx, EVP_sha256()) == 1;
+    if (ok) {
+        if (sign) ok = EVP_DigestSign(c, sig, siglen, msg, mlen) == 1;
+        else      ok = EVP_DigestVerify(c, sig, *siglen, msg, mlen) == 1;
+    }
+    EVP_MD_CTX_free(c);
+    return ok ? 0 : -1;
+}
+static int rsa_make_payload(uint8_t *pl, size_t *plen, int *verdict) {
+    if (!g_rsa_key) g_rsa_key = EVP_RSA_gen(2048);
+    if (!g_rsa_key) return -1;
+    size_t mlen = 1 + (rnd() % 200);
+    uint8_t msg[256];
+    for (size_t i = 0; i < mlen; i++) msg[i] = (uint8_t)(rnd() & 0xFF);
+    uint8_t sig[512]; size_t siglen = sizeof sig;
+    if (rsa_pss_sign_or_verify(1, sig, &siglen, msg, mlen) != 0) return -1;
+    if (rnd() & 1) msg[rnd() % mlen] ^= 0x01;   /* tamper -> signature no longer valid */
+    *verdict = (rsa_pss_sign_or_verify(0, sig, &siglen, msg, mlen) == 0) ? 1 : 0;
+    BIGNUM *bn = NULL;
+    if (EVP_PKEY_get_bn_param(g_rsa_key, OSSL_PKEY_PARAM_RSA_N, &bn) != 1 || !bn) return -1;
+    uint8_t nbuf[512]; int nlen = BN_bn2bin(bn, nbuf);
+    BN_free(bn);
+    if (nlen <= 0) return -1;
+    size_t off = 0;
+    pl[off++] = (uint8_t)((size_t)nlen >> 8); pl[off++] = (uint8_t)((size_t)nlen & 0xFF);
+    memcpy(pl + off, nbuf, (size_t)nlen); off += (size_t)nlen;
+    pl[off++] = (uint8_t)(siglen >> 8); pl[off++] = (uint8_t)(siglen & 0xFF);
+    memcpy(pl + off, sig, siglen); off += siglen;
+    memcpy(pl + off, msg, mlen); off += mlen;
+    *plen = off; return 0;
+}
+
 static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     switch (v->op) {
         case 0: return ref_digest(EVP_sha256(), v, o, n);
@@ -178,7 +231,7 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     return -1;
 }
 
-#define CMF_NUM_OPS 14   /* ops 0..13 (see compute_common.h) */
+#define CMF_NUM_OPS 15   /* ops 0..14 (see compute_common.h) */
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
@@ -208,9 +261,11 @@ int main(int argc, char **argv) {
 
         /* Verify-interop ops carry a packed (pub||sig||msg) payload in the msg
          * region and compare only the 1-byte accept/reject verdict. */
-        if (op == 13) {
-            uint8_t payload[1024]; size_t plen = 0; int verdict = 0;
-            if (ecdsa_make_payload(payload, &plen, &verdict) != 0) {
+        if (op == 13 || op == 14) {
+            uint8_t payload[2048]; size_t plen = 0; int verdict = 0;
+            int gen = (op == 13) ? ecdsa_make_payload(payload, &plen, &verdict)
+                                 : rsa_make_payload(payload, &plen, &verdict);
+            if (gen != 0) {
                 /* still emit a well-formed (empty-payload) request so the line
                  * count stays in lockstep; every backend will reply reject. */
                 plen = 0; verdict = 0;

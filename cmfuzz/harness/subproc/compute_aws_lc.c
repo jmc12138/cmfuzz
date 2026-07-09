@@ -16,9 +16,34 @@
 #include <openssl/curve25519.h>
 #include <openssl/ec.h>
 #include <openssl/ecdsa.h>
+#include <openssl/rsa.h>
+#include <openssl/bn.h>
 #include <openssl/sha.h>
 #include <openssl/nid.h>
 #include "compute_common.h"
+
+/* RSA-PSS verify-interop (op14): rebuild the public key from the raw modulus n
+ * (exponent fixed at 65537), verify RSA-PSS(SHA-256, MGF1-SHA-256, salt=32) over
+ * SHA-256(message); reply 1-byte accept/reject. */
+static int rsa_pss_verify(const cmf_vec_t *v, uint8_t *out, size_t *n_out) {
+    const uint8_t *pub, *sig, *msg; size_t publen, siglen, mlen;
+    int verdict = 0;
+    if (cmf_verify_parse(v->msg, v->msglen, &pub, &publen, &sig, &siglen, &msg, &mlen) == 0) {
+        uint8_t d[32]; SHA256(msg, mlen, d);
+        RSA *rsa = RSA_new();
+        BIGNUM *n = BN_bin2bn(pub, publen, NULL);
+        BIGNUM *e = BN_new();
+        if (rsa && n && e && BN_set_word(e, CMF_RSA_PUB_E) &&
+            RSA_set0_key(rsa, n, e, NULL)) {
+            n = NULL; e = NULL;   /* ownership transferred to rsa */
+            verdict = RSA_verify_pss_mgf1(rsa, d, sizeof d, EVP_sha256(),
+                                          EVP_sha256(), CMF_RSA_SALTLEN,
+                                          sig, siglen) == 1 ? 1 : 0;
+        }
+        BN_free(n); BN_free(e); RSA_free(rsa);
+    }
+    out[0] = (uint8_t)verdict; *n_out = 1; return 0;
+}
 
 /* ECDSA-P256 verify-interop (op13): import the SEC1 uncompressed public point,
  * verify the DER signature over SHA-256(message); reply 1-byte accept/reject. */
@@ -121,6 +146,7 @@ int main(void) {
                 case 11: rc = ed25519(&v, out, &n); break;
                 case 12: rc = x25519(&v, out, &n); break;
                 case 13: rc = ecdsa_verify(&v, out, &n); break;
+                case 14: rc = rsa_pss_verify(&v, out, &n); break;
             }
             free(v.blob);
         }

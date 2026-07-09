@@ -22,7 +22,31 @@
 #include <wolfssl/wolfcrypt/curve25519.h>
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/rsa.h>
 #include "compute_common.h"
+
+/* RSA-PSS verify-interop (op14): rebuild the public key from the raw modulus n
+ * (exponent fixed at 65537), verify RSA-PSS(SHA-256, MGF1-SHA-256, salt=32) over
+ * SHA-256(message); reply 1-byte accept/reject. */
+static int rsa_pss_verify(const cmf_vec_t *v, uint8_t *out, size_t *n_out) {
+    const uint8_t *pub, *sig, *msg; size_t publen, siglen, mlen;
+    int verdict = 0;
+    if (cmf_verify_parse(v->msg, v->msglen, &pub, &publen, &sig, &siglen, &msg, &mlen) == 0) {
+        static const uint8_t e[3] = { 0x01, 0x00, 0x01 };   /* 65537 */
+        uint8_t d[WC_SHA256_DIGEST_SIZE];
+        RsaKey key;
+        if (wc_Sha256Hash(msg, (word32)mlen, d) == 0 && wc_InitRsaKey(&key, NULL) == 0) {
+            uint8_t rec[512];
+            if (wc_RsaPublicKeyDecodeRaw(pub, (word32)publen, e, sizeof e, &key) == 0 &&
+                wc_RsaPSS_VerifyCheck((byte *)sig, (word32)siglen, rec, sizeof rec,
+                                      d, sizeof d, WC_HASH_TYPE_SHA256,
+                                      WC_MGF1SHA256, &key) > 0)
+                verdict = 1;
+            wc_FreeRsaKey(&key);
+        }
+    }
+    out[0] = (uint8_t)verdict; *n_out = 1; return 0;
+}
 
 /* ECDSA-P256 verify-interop (op13): import the SEC1 uncompressed public point
  * (wc_ecc_import_x963 infers SECP256R1 from the 65-byte length), verify the DER
@@ -194,6 +218,7 @@ int main(void) {
                 case 11: rc = ed25519_sign(&v, out, &n); break;
                 case 12: rc = x25519_ss(&v, out, &n); break;
                 case 13: rc = ecdsa_verify(&v, out, &n); break;
+                case 14: rc = rsa_pss_verify(&v, out, &n); break;
             }
             free(v.blob);
         }

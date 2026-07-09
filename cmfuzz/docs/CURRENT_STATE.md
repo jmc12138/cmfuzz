@@ -248,6 +248,18 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
   `ecdsa,pcurves_secp256r1` 模块，否则 P-256（OID 1.2.840.10045.3.1.7）"not supported"。
 - 实测 **五方 11000 向量（含 op13 接受/拒绝两类）全一致**（seed 42×6000 + 777×5000）。
 
+**第五批：RSA-PSS 验签互操作（op14）** —— 同 op13 的验签互操作模式：参照端（OpenSSL）用一把
+**RSA-2048** 密钥（整轮复用，keygen 昂贵）做 **RSA-PSS(SHA-256, MGF1-SHA-256, salt=32)** 签名
+（约半数向量篡改 message），后端只回 1 字节接受/拒绝判定，五方必须一致。
+- **公钥编码取巧**：不传结构化 DER，`pubkey` 字段只放**裸模数 n**（大端），公钥指数固定 65537，
+  避开各库 SPKI/PKCS#1 DER 解析差异，直接由 (n, 65537) 重建公钥。
+- 五后端：OpenSSL 参照 `EVP_DigestSign/Verify` + `EVP_PKEY_CTX_set_rsa_pss_saltlen(32)`；
+  BoringSSL/aws-lc 用 `RSA_set0_key(n,e)`+`RSA_verify_pss_mgf1`（对 SHA-256 摘要，saltlen=32）；
+  wolfCrypt 用 `wc_RsaPublicKeyDecodeRaw`+`wc_RsaPSS_VerifyCheck`；Botan 用 `RSA_PublicKey(n,e)`
+  +`PK_Verifier("PSS(SHA-256)")`（salt 长度自动识别）。Botan amalgamation 再加 `rsa,emsa_pssr,mgf1`
+  模块。
+- 实测 **五方 11000 向量（含 op14 接受/拒绝两类）全一致**（seed 42×6000 + 777×5000）。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -257,7 +269,7 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
 | **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
 | **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商；AES-256-CBC：可预测/复用 IV；EVP 上下文 use-after-free；**BoringSSL + aws-lc EVP_AEAD + wolfCrypt/Botan AES-GCM：nonce 复用、release-before-verify** | ✅ |
-| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL + aws-lc + wolfCrypt + Botan 独立子进程差分**（`diff_subproc`，op0–13＝哈希/HMAC/AEAD + SHA-3/SHAKE + HKDF/PBKDF2 + Ed25519/X25519 + ECDSA-P256 验签互操作，vs OpenSSL 五方一致） | ✅ |
+| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL + aws-lc + wolfCrypt + Botan 独立子进程差分**（`diff_subproc`，op0–14＝哈希/HMAC/AEAD + SHA-3/SHAKE + HKDF/PBKDF2 + Ed25519/X25519 + ECDSA-P256/RSA-PSS 验签互操作，vs OpenSSL 五方一致） | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
 
@@ -301,6 +313,14 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（夜·9）：**PLAN 阶段2.2（差分算法扩展·第五批 RSA-PSS 验签互操作）** —— 子进程
+  差分协议加 op14，验签互操作模式：参照端 OpenSSL 用一把复用的 RSA-2048 密钥做
+  RSA-PSS(SHA-256, MGF1-SHA-256, salt=32) 签名（约半数篡改），后端只回 1 字节判定。公钥编码
+  取巧——`pubkey` 字段只放裸模数 n、指数固定 65537，避开各库 DER 解析差异。五后端：BoringSSL/
+  aws-lc `RSA_set0_key`+`RSA_verify_pss_mgf1`；wolfCrypt `wc_RsaPublicKeyDecodeRaw`+
+  `wc_RsaPSS_VerifyCheck`；Botan `RSA_PublicKey(n,e)`+`PK_Verifier("PSS(SHA-256)")`（salt 自动识别），
+  amalgamation 加 `rsa,emsa_pssr,mgf1` 模块。**五方 11000 向量（含 op14 双判定）全一致**
+  （seed 42×6000 + 777×5000）。负向自测仍 **27/27**（DIFF_mismatch 覆盖 op0–14）。本阶段 0 新发现。
 - 2026-07-09（夜·8）：**PLAN 阶段2.2（差分算法扩展·第四批 ECDSA-P256 验签互操作）** —— 因
   RSA/ECDSA 密钥结构化且 ECDSA `k` 随机化、签名字节不可比，改用**验签互操作 oracle**：子进程
   差分协议加 op13，参照端 OpenSSL 生成 P-256 密钥对 + ECDSA-SHA256 签名（约半数篡改 message），

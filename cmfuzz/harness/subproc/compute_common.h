@@ -30,6 +30,12 @@
  *                               1-byte verdict 01=accept / 00=reject, and all
  *                               backends must agree on the verdict. The msg
  *                               region carries a verify-payload, see below.)
+ *             14 RSA-PSS verify (verify-interop oracle: reference/OpenSSL RSA-2048
+ *                               key, RSA-PSS(SHA-256, MGF1-SHA-256, salt=32)
+ *                               signature, sometimes tampered. The "pubkey" field
+ *                               of the verify-payload is the raw modulus n; the
+ *                               public exponent is fixed at 65537. Same 1-byte
+ *                               accept/reject verdict comparison as op13.)
  *
  * Verify-payload (ops >= 13, packed inside the msg region):
  *     pubkeylen(2, BE) || pubkey || siglen(2, BE) || sig || message
@@ -61,6 +67,11 @@
 /* Public-key differential parameters (ops 11/12) — deterministic primitives. */
 #define CMF_ED25519_SIGLEN 64
 #define CMF_X25519_LEN     32
+
+/* RSA-PSS verify-interop (op14): fixed public exponent + PSS salt length so the
+ * verdict is well-defined across libraries. */
+#define CMF_RSA_PUB_E   65537
+#define CMF_RSA_SALTLEN 32
 
 /* Verify-interop ops (>= 13): parse the packed verify-payload out of the msg
  * region into (public key, signature, message) views. Returns 0 on success. */

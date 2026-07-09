@@ -77,6 +77,24 @@ static int ecdsa_verify(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     out[0] = (uint8_t)verdict; *n = 1; return 0;
 }
 
+/* RSA-PSS verify-interop (op14): rebuild the public key from the raw modulus n
+ * (exponent fixed at 65537), verify RSA-PSS(SHA-256, MGF1-SHA-256) — the salt
+ * length is auto-detected by "PSS(SHA-256)" — over the message; 1-byte verdict. */
+static int rsa_pss_verify(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    const uint8_t *pub, *sig, *msg; size_t publen, siglen, mlen;
+    int verdict = 0;
+    if (cmf_verify_parse(v->msg, v->msglen, &pub, &publen, &sig, &siglen, &msg, &mlen) == 0) {
+        try {
+            Botan::BigInt nn = Botan::BigInt::from_bytes(std::span<const uint8_t>(pub, publen));
+            Botan::BigInt ee(static_cast<uint64_t>(CMF_RSA_PUB_E));
+            Botan::RSA_PublicKey key(nn, ee);
+            Botan::PK_Verifier ver(key, "PSS(SHA-256)", Botan::Signature_Format::Standard);
+            verdict = ver.verify_message(msg, mlen, sig, siglen) ? 1 : 0;
+        } catch (...) { verdict = 0; }
+    }
+    out[0] = (uint8_t)verdict; *n = 1; return 0;
+}
+
 static int digest(const char *name, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     auto h = Botan::HashFunction::create(name);
     if (!h) return -1;
@@ -134,6 +152,7 @@ int main(void) {
                     case 11: rc = ed25519(&v, out, &n); break;
                     case 12: rc = x25519(&v, out, &n); break;
                     case 13: rc = ecdsa_verify(&v, out, &n); break;
+                    case 14: rc = rsa_pss_verify(&v, out, &n); break;
                 }
             } catch (...) { rc = -1; }
             free(v.blob);
