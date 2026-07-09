@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# Build the stage-2.1 subprocess differential stack (BoringSSL + aws-lc).
+# Build the stage-2.1 subprocess differential stack (BoringSSL + aws-lc + wolfCrypt).
 #
-# BoringSSL / aws-lc redefine OpenSSL symbols, so they cannot share a process
-# with the OpenSSL-linked reference. Instead:
+# Each extra library runs behind a standalone compute CLI driven by the runner
+# (which links OpenSSL as the reference). BoringSSL/aws-lc must be isolated
+# because they redefine OpenSSL symbols; wolfCrypt uses its own wc_* API and is
+# kept behind a subprocess for uniformity. Targets:
 #   - diff_subproc         : runner, links OpenSSL (reference), drives CLIs.
 #   - compute_boringssl    : standalone CLI, links ONLY BoringSSL.
 #   - compute_aws_lc       : standalone CLI, links ONLY aws-lc.
+#   - compute_wolfssl      : standalone CLI, links ONLY wolfCrypt.
 #   - seq_boringssl        : BoringSSL EVP_AEAD L3 misuse harness (libFuzzer+ASan).
 #   - seq_aws_lc           : aws-lc   EVP_AEAD L3 misuse harness (libFuzzer+ASan).
+#   - seq_wolfssl          : wolfCrypt AES-GCM L3 misuse harness (libFuzzer+ASan).
 #
-# These static libs are built from C++ objects, so their consumers must be
-# LINKED with clang++ (C++ runtime) even though the sources are C. BoringSSL is
-# required for this script; aws-lc is optional (needs Go >= 1.20) and skipped if
-# its build fails.
+# BoringSSL/aws-lc static libs contain C++ objects, so their consumers must be
+# LINKED with clang++ even though the sources are C; wolfCrypt is pure C.
+# BoringSSL is required for this script; aws-lc (needs Go >= 1.20) and wolfCrypt
+# (needs autotools) are optional and skipped if their build fails.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/build/harness"
@@ -52,6 +56,20 @@ if bash "$ROOT/scripts/build_aws_lc.sh" >/dev/null 2>&1; then
   fi
 else
   echo "[build_subproc] aws-lc skipped (build failed; needs Go >= 1.20)" >&2
+fi
+
+# wolfCrypt backend (optional: needs autotools). Native wc_* API — its compute
+# CLI + L3 harness are pure C and link directly with clang (no C++ runtime).
+if bash "$ROOT/scripts/build_wolfssl.sh" >/dev/null 2>&1; then
+  WOLF_A="$(find "$ROOT/libs/wolfssl/src/.libs" -name libwolfssl.a 2>/dev/null | head -1)"
+  WOLF_INC="$ROOT/libs/wolfssl"
+  if [ -n "$WOLF_A" ]; then
+    clang -g -O1 "$SUB/compute_wolfssl.c" -I"$SUB" -I"$WOLF_INC" "$WOLF_A" -lm -o "$OUT/compute_wolfssl"
+    clang $SAN "$SUB/seq_wolfssl_harness.c" -I"$WOLF_INC" "$WOLF_A" -lm -o "$OUT/seq_wolfssl"
+    built="$built + compute_wolfssl + seq_wolfssl"
+  fi
+else
+  echo "[build_subproc] wolfCrypt skipped (build failed; needs autotools)" >&2
 fi
 
 echo "[build_subproc] built $built"

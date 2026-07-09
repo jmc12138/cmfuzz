@@ -142,6 +142,31 @@ else
   echo "SKIP  aws-lc subprocess self-tests (aws-lc not built; run scripts/build_aws_lc.sh — needs Go >= 1.20)"
 fi
 
+# wolfCrypt subprocess differential + L3 self-tests (only if wolfCrypt built; needs autotools).
+WOLF_A="$(find "$ROOT/libs/wolfssl/src/.libs" -name libwolfssl.a 2>/dev/null | head -1)"
+if [ -n "$WOLF_A" ]; then
+  WINC="-I$ROOT/libs/wolfssl"; WSAN="-fsanitize=address,fuzzer -g -O1"
+  SUB="$ROOT/harness/subproc"
+  echo "[neg] building wolfCrypt fault-injected L3 harnesses..."
+  clang $WSAN $WINC -DCMF_FAULT_NONCE=1 "$SUB/seq_wolfssl_harness.c" "$WOLF_A" -lm -o "$TMP/wolf_nonce" 2>/dev/null
+  clang $WSAN $WINC -DCMF_FAULT_RELEASE=1 "$SUB/seq_wolfssl_harness.c" "$WOLF_A" -lm -o "$TMP/wolf_release" 2>/dev/null
+  check "L3 wolfCrypt AES-GCM detects nonce reuse"             "$TMP/wolf_nonce" "O6-nonce-uniqueness"
+  check "L3 wolfCrypt AES-GCM detects release-before-verify"   "$TMP/wolf_release" "O6-release-before-verify"
+
+  echo "[neg] building wolfCrypt subprocess differential self-test..."
+  [ -x "$TMP/diff_subproc" ] || clang -g -O1 "$SUB/diff_subproc_runner.c" -I"$SUB" -lcrypto -o "$TMP/diff_subproc"
+  clang -g -O1 -DCMF_DIFF_FAULT=1 "$SUB/compute_wolfssl.c" $WINC -I"$SUB" "$WOLF_A" -lm -o "$TMP/compute_wolf_fault" 2>/dev/null
+  "$TMP/diff_subproc" 200 12345 wolfcrypt_fault="$TMP/compute_wolf_fault" > "$TMP/subout_wolf.txt" 2>&1 || true
+  cat "$TMP/subout_wolf.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/subout_wolf.txt"; then
+    echo "PASS  Subprocess differential detects divergent wolfCrypt backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Subprocess differential wolfCrypt (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  wolfCrypt subprocess self-tests (wolfCrypt not built; run scripts/build_wolfssl.sh — needs autotools)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]
