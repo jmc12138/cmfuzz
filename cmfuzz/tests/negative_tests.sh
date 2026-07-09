@@ -192,6 +192,25 @@ else
   echo "SKIP  Botan subprocess self-tests (Botan not built; run scripts/build_botan.sh — needs python3 + C++20)"
 fi
 
+# Stage 2.3 PQC cross-library differential self-test (liboqs vs PQClean; only if
+# the PQClean archive is built).
+PQC_A="$ROOT/libs/pqclean/build/libpqclean.a"
+if [ -f "$PQC_A" ]; then
+  echo "[neg] building fault-injected PQC differential (liboqs vs PQClean)..."
+  clang -fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1 \
+    -DCMF_PQC_FAULT=1 $INC "$ROOT/harness/pqc_diff_harness.c" \
+    "$LIB" "$PQC_A" $EXTRA -o "$TMP/pqc_diff_fault" 2>/dev/null
+  "$TMP/pqc_diff_fault" 50 12345 > "$TMP/pqcout.txt" 2>&1 || true
+  cat "$TMP/pqcout.txt" >&2
+  if grep -q "oracle=O1_kem_interop\|oracle=O1_sig_verify_interop" "$TMP/pqcout.txt"; then
+    echo "PASS  PQC differential detects liboqs<->PQClean divergence (O1_*_interop)"; pass=$((pass+1))
+  else
+    echo "FAIL  PQC differential (expected O1_kem_interop / O1_sig_verify_interop)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  PQC differential self-test (PQClean not built; run scripts/build_pqclean.sh)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

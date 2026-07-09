@@ -77,6 +77,10 @@ RUN bash scripts/build_liboqs.sh \
     && clang $SAN harness/comp_kdfchain_harness.c -lcrypto -o build/harness/comp_kdfchain \
     && clang $SAN harness/seq_aead_harness.c -lcrypto -o build/harness/seq_aead
 
+# Stage 2.3 PQC cross-library differential: PQClean is a lightweight header/C
+# reference build, so we include it (and its self-test runs in negative_tests).
+RUN bash scripts/build_pqc_diff.sh
+
 # Sanity-check the oracles actually fire on injected faults at image-build time.
 RUN bash tests/negative_tests.sh
 

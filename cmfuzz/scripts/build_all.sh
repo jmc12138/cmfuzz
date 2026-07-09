@@ -57,4 +57,6 @@ fi
 # Stage 2.1 subprocess differential (BoringSSL). Optional: needs Go to build
 # BoringSSL, so a minimal setup without Go still succeeds.
 bash "$ROOT/scripts/build_subproc.sh" || echo "[build_all] subprocess diff skipped (BoringSSL/Go missing)"
+# Stage 2.3 PQC cross-library differential (liboqs vs PQClean). Optional.
+bash "$ROOT/scripts/build_pqc_diff.sh" || echo "[build_all] PQC diff skipped (PQClean missing)"
 echo "[build_all] done"

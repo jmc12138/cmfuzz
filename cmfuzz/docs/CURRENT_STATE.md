@@ -260,6 +260,20 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
   模块。
 - 实测 **五方 11000 向量（含 op14 接受/拒绝两类）全一致**（seed 42×6000 + 777×5000）。
 
+### 2.13 阶段 2.3 —— PQC 跨库差分（liboqs vs PQClean）【新】
+此前 PQC 只有 O2（性质/变形 oracle），缺 O1（跨实现差分）。本阶段接 **PQClean** 参照实现，
+对两个 NIST 标准方案 **ML-KEM-768（FIPS 203）**、**ML-DSA-65（FIPS 204）** 与 liboqs 做 O1 差分。
+- **构建**：`scripts/build_pqclean.sh` 编出 `libpqclean.a`（ml-kem-768/clean + ml-dsa-65/clean +
+  common/fips202 + randombytes）。PQClean 每方案符号带前缀（`PQCLEAN_MLKEM768_CLEAN_*` 等），liboqs
+  用 `OQS_*`/`OQS_SHA3_*` 前缀，二者**无符号冲突**，同一二进制内可并链。
+- **oracle 设计**（随机化 KEM encaps / ML-DSA 签名使字节级不可比，同 op13/op14 思路改比"互操作结果"）：
+  - **KEM 互操作（双向）**：A 库 keygen → B 库 encaps（对 A 的公钥）→ A 库 decaps，两个共享密钥必须相等；
+    正反两向都测，检验跨库公钥/密文线编码兼容性。
+  - **SIG 验签互操作（双向）**：A 库签名后，A/B 两库对同一 (pk, sig, message) 及其篡改副本的
+    接受/拒绝判定必须一致。
+- 实测 **liboqs↔PQClean 双向 5000 迭代（ML-KEM-768 KEM + ML-DSA-65 sign/verify）全一致**
+  （seed 42×2000 + 777×5000），故障注入自测正确触发 `O1_kem_interop`。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -269,7 +283,7 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
 | **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
 | **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商；AES-256-CBC：可预测/复用 IV；EVP 上下文 use-after-free；**BoringSSL + aws-lc EVP_AEAD + wolfCrypt/Botan AES-GCM：nonce 复用、release-before-verify** | ✅ |
-| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL + aws-lc + wolfCrypt + Botan 独立子进程差分**（`diff_subproc`，op0–14＝哈希/HMAC/AEAD + SHA-3/SHAKE + HKDF/PBKDF2 + Ed25519/X25519 + ECDSA-P256/RSA-PSS 验签互操作，vs OpenSSL 五方一致） | ✅ |
+| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL + aws-lc + wolfCrypt + Botan 独立子进程差分**（`diff_subproc`，op0–14＝哈希/HMAC/AEAD + SHA-3/SHAKE + HKDF/PBKDF2 + Ed25519/X25519 + ECDSA-P256/RSA-PSS 验签互操作，vs OpenSSL 五方一致）；**PQC 跨库 O1 差分 liboqs↔PQClean**（ML-KEM-768 KEM 互操作 + ML-DSA-65 验签互操作，双向） | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
 
@@ -287,9 +301,11 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **27/27**（含差分库 + BoringSSL + aws-lc + wolfCrypt + Botan；只到 wolfCrypt 24；只到 aws-lc 21；只到 BoringSSL 18；仅差分库 15；最小 14）：
+`tests/negative_tests.sh` ✅ **28/28**（含差分库 + BoringSSL + aws-lc + wolfCrypt + Botan + PQClean；
+只到 Botan 27；只到 wolfCrypt 24；只到 aws-lc 21；只到 BoringSSL 18；仅差分库 15；最小 14）：
 BoringSSL / aws-lc / wolfCrypt / Botan 各贡献 **L3 nonce 复用 + release-before-verify + 子进程 DIFF_mismatch**
-三项（各自仅在对应库已编时运行，否则 SKIP）。故障注入使以下 oracle 全部正确触发——
+三项，PQClean 贡献 **PQC 跨库差分 O1_kem_interop**（各自仅在对应库已编时运行，否则 SKIP）。
+故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
 **L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
 **L2 TLS1.3 seq 绑定(O5-seq-binding)**、**L2 认证 KEM transcript 绑定(O5-transcript-binding)**、
@@ -313,6 +329,14 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（夜·10）：**PLAN 阶段2.3（PQC 跨库差分 liboqs vs PQClean）** —— 补上 PQC 缺的 O1
+  跨实现差分（此前仅 O2）。接 PQClean 参照实现，对 ML-KEM-768（FIPS 203）、ML-DSA-65（FIPS 204）
+  与 liboqs 做差分。因 KEM encaps / ML-DSA 签名随机化、字节不可比，用互操作 oracle：KEM 双向
+  keygen/encaps/decaps 跨库、共享密钥必须相等；SIG 双向签名后两库对同一 (pk,sig,msg) 及篡改副本
+  的接受/拒绝判定必须一致。PQClean 符号带方案前缀、与 liboqs `OQS_*` 无冲突，同一二进制并链
+  （`scripts/build_pqclean.sh` → `libpqclean.a`；`scripts/build_pqc_diff.sh` → `build/harness/pqc_diff`）。
+  **双向 5000 迭代全一致**（seed 42×2000 + 777×5000）；负向自测升 **28/28**（新增 PQC O1_kem_interop
+  故障注入）。build_all + Dockerfile 已接入。本阶段 0 新发现。
 - 2026-07-09（夜·9）：**PLAN 阶段2.2（差分算法扩展·第五批 RSA-PSS 验签互操作）** —— 子进程
   差分协议加 op14，验签互操作模式：参照端 OpenSSL 用一把复用的 RSA-2048 密钥做
   RSA-PSS(SHA-256, MGF1-SHA-256, salt=32) 签名（约半数篡改），后端只回 1 字节判定。公钥编码
