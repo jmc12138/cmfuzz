@@ -9,6 +9,21 @@ export CC=clang CXX=clang++
 IFLAGS="-fsanitize=address,fuzzer-no-link -g -O1 -fno-omit-frame-pointer"
 JOBS="$(nproc)"
 
+# Clone the differential library sources at pinned versions if absent. These
+# are not vendored in git (like liboqs/SEAL) so a fresh checkout can rebuild the
+# whole differential stack from scratch.
+clone_pin() {  # url dir tag
+  local url="$1" dir="$2" tag="$3"
+  [ -d "$LIBS/$dir/.git" ] && return 0
+  echo "[clone] $dir @ $tag"
+  git clone --depth 1 --branch "$tag" --recurse-submodules --shallow-submodules \
+    "$url" "$LIBS/$dir" 2>/dev/null \
+    || git clone --depth 1 --recurse-submodules "$url" "$LIBS/$dir"
+}
+clone_pin https://github.com/jedisct1/libsodium.git libsodium 1.0.20
+clone_pin https://github.com/Mbed-TLS/mbedtls.git    mbedtls   mbedtls-3.6.2
+clone_pin https://github.com/weidai11/cryptopp.git   cryptopp  CRYPTOPP_8_9_0
+
 echo "===== libsodium ====="
 cd "$LIBS/libsodium"
 if [ ! -f build/lib/libsodium.a ]; then

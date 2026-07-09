@@ -15,7 +15,7 @@
 | 库 | 版本 | 语言 | 构建产物 | 用途 |
 |---|---|---|---|---|
 | OpenSSL | 3.0.2 | C | 系统 libcrypto | 传统算法（差分 + 单库靶） |
-| libsodium | 1.0.23 | C | `libs/libsodium/build/lib/libsodium.a` | 传统算法差分 |
+| libsodium | 1.0.20 | C | `libs/libsodium/build/lib/libsodium.a` | 传统算法差分 |
 | Mbed-TLS | 3.6.2 | C | `libs/mbedtls/build/library/libmbedcrypto.a` | 传统算法差分 |
 | Crypto++ | 8.9.0 | C++ | `libs/cryptopp/libcryptopp.a` | 传统算法差分 |
 | liboqs | 0.16.0-rc1 | C | `libs/liboqs/build/lib/liboqs.a` | PQC KEM/签名 |

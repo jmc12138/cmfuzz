@@ -92,8 +92,9 @@ timeout 60 ./build/harness/comp_hpke_mlkem -max_total_time=60 -print_final_stats
 
 ## Gotchas
 
-- **liboqs / SEAL are not in git** — they are cloned by their build scripts. First
-  build needs network access.
+- **liboqs / SEAL / the diff libs are not in git** — they are cloned by their build
+  scripts (`build_liboqs.sh`, `build_seal.sh`, and `build_diff_libs.sh` which pins
+  libsodium 1.0.20 / mbedtls-3.6.2 / cryptopp 8.9.0). First build needs network access.
 - **Debug build of liboqs** is intentional: ASan/UBSan traces are useless without
   frame info. Don't switch it to Release "for speed".
 - **Optional libs skip gracefully**: `build_all.sh` and `negative_tests.sh` detect
