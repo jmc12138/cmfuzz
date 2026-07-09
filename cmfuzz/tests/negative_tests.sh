@@ -303,6 +303,24 @@ else
   echo "SKIP  nettle cross-library self-test (nettle-dev not installed)"
 fi
 
+# Stage 3 ecosystem: Bouncy Castle (Java) cross-language differential self-test.
+# Only if a JDK is present; build_java_diff.sh compiles + emits a fault wrapper.
+if command -v javac >/dev/null 2>&1 && command -v java >/dev/null 2>&1; then
+  echo "[neg] building fault-injected Bouncy Castle (Java) backend..."
+  bash "$ROOT/scripts/build_java_diff.sh" fault >/dev/null 2>&1
+  "$ROOT/build/harness/diff_subproc" 200 12345 bouncycastle_fault="$ROOT/build/harness/compute_bouncycastle_fault" > "$TMP/bcout.txt" 2>&1 || true
+  cat "$TMP/bcout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/bcout.txt"; then
+    echo "PASS  Cross-language differential detects divergent Bouncy Castle backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Cross-language differential Bouncy Castle (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+  # Rebuild the clean (non-fault) wrapper so later steps don't reuse the fault one.
+  bash "$ROOT/scripts/build_java_diff.sh" >/dev/null 2>&1 || true
+else
+  echo "SKIP  Bouncy Castle cross-language self-test (JDK not installed)"
+fi
+
 # Stage 2.5 FHE oracles self-test: OpenFHE<->SEAL BFV cross-library differential
 # (O1) + SEAL CKKS approximate-arithmetic error bound (O2). Only if both FHE
 # libraries are already built (OpenFHE is heavy; build_fhe_diff.sh builds it on

@@ -73,4 +73,7 @@ bash "$ROOT/scripts/build_py_diff.sh" || echo "[build_all] Python diff skipped (
 # differentials. Optional: need libgcrypt20-dev / nettle-dev headers.
 bash "$ROOT/scripts/build_gcrypt_diff.sh" || echo "[build_all] libgcrypt diff skipped (headers missing)"
 bash "$ROOT/scripts/build_nettle_diff.sh" || echo "[build_all] nettle diff skipped (headers missing)"
+# Stage 3 ecosystem: Bouncy Castle cross-language differential (Java, independent
+# implementation). Optional: needs a JDK (javac/java).
+bash "$ROOT/scripts/build_java_diff.sh" || echo "[build_all] Java diff skipped (JDK missing)"
 echo "[build_all] done"

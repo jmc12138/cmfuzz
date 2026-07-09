@@ -47,6 +47,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         pkg-config \
         libgcrypt20-dev \
         nettle-dev \
+        default-jdk \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -106,10 +107,12 @@ RUN bash scripts/build_go_diff.sh \
     && bash scripts/build_rust_diff.sh
 
 # Stage 3 ecosystem: PyCryptodome (Python) + libgcrypt (GnuPG) + nettle (GnuTLS)
-# cross-library differentials; their self-tests run in negative_tests below.
+# + Bouncy Castle (Java) cross-library differentials; self-tests run in
+# negative_tests below. build_java_diff.sh fetches the pinned BC provider jar.
 RUN bash scripts/build_py_diff.sh \
     && bash scripts/build_gcrypt_diff.sh \
-    && bash scripts/build_nettle_diff.sh
+    && bash scripts/build_nettle_diff.sh \
+    && bash scripts/build_java_diff.sh
 
 # Sanity-check the oracles actually fire on injected faults at image-build time.
 RUN bash tests/negative_tests.sh
