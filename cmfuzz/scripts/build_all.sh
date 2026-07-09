@@ -66,4 +66,7 @@ bash "$ROOT/scripts/build_rust_diff.sh" || echo "[build_all] Rust cross-lang dif
 # Stage 2.5 FHE oracles: OpenFHE<->SEAL BFV differential + SEAL CKKS error bound.
 # Optional: needs OpenFHE (built on demand by build_fhe_diff.sh).
 bash "$ROOT/scripts/build_fhe_diff.sh" || echo "[build_all] FHE diff skipped (OpenFHE/SEAL missing)"
+# Stage 3 ecosystem: PyCryptodome cross-language differential (Python, independent
+# implementation). Optional: needs python3 + pycryptodome.
+bash "$ROOT/scripts/build_py_diff.sh" || echo "[build_all] Python diff skipped (pycryptodome missing)"
 echo "[build_all] done"

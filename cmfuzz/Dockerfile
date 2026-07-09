@@ -39,6 +39,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         git \
         ca-certificates \
         python3 \
+        python3-pip \
         build-essential \
         autoconf \
         automake \
@@ -64,6 +65,10 @@ ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y \
         --no-modify-path --profile minimal --default-toolchain "${RUST_VERSION}"
 ENV PATH="/opt/rust/cargo/bin:${PATH}"
+
+# PyCryptodome: independent Python crypto implementation for the stage-3
+# cross-language differential (harness/subproc/compute_pycryptodome.py).
+RUN pip3 install --no-cache-dir pycryptodome
 
 WORKDIR /opt/cmfuzz
 COPY . /opt/cmfuzz
@@ -97,6 +102,10 @@ RUN bash scripts/build_pqc_diff.sh
 # negative_tests below).
 RUN bash scripts/build_go_diff.sh \
     && bash scripts/build_rust_diff.sh
+
+# Stage 3 ecosystem: PyCryptodome cross-language differential (Python backend;
+# its self-test runs in negative_tests below).
+RUN bash scripts/build_py_diff.sh
 
 # Sanity-check the oracles actually fire on injected faults at image-build time.
 RUN bash tests/negative_tests.sh

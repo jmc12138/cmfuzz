@@ -249,6 +249,27 @@ else
   echo "SKIP  Rust cross-language self-test (cargo not installed)"
 fi
 
+# Stage 3 ecosystem: PyCryptodome cross-language differential self-test (Python,
+# independent implementation vs OpenSSL). Only if python3 + pycryptodome present.
+if command -v python3 >/dev/null 2>&1 && python3 -c "import Crypto" >/dev/null 2>&1; then
+  echo "[neg] building fault-injected PyCryptodome cross-language backend..."
+  [ -x "$TMP/diff_subproc" ] || cc -g -O1 "$ROOT/harness/subproc/diff_subproc_runner.c" -I"$ROOT/harness/subproc" -lcrypto -o "$TMP/diff_subproc"
+  cat > "$TMP/compute_py_fault" <<EOF
+#!/usr/bin/env bash
+exec env CMF_PY_FAULT=1 python3 "$ROOT/harness/subproc/compute_pycryptodome.py" "\$@"
+EOF
+  chmod +x "$TMP/compute_py_fault"
+  "$TMP/diff_subproc" 200 12345 pycryptodome_fault="$TMP/compute_py_fault" > "$TMP/pyout.txt" 2>&1 || true
+  cat "$TMP/pyout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/pyout.txt"; then
+    echo "PASS  Cross-language differential detects divergent PyCryptodome backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Cross-language differential PyCryptodome (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  PyCryptodome cross-language self-test (python3/pycryptodome not installed)"
+fi
+
 # Stage 2.5 FHE oracles self-test: OpenFHE<->SEAL BFV cross-library differential
 # (O1) + SEAL CKKS approximate-arithmetic error bound (O2). Only if both FHE
 # libraries are already built (OpenFHE is heavy; build_fhe_diff.sh builds it on
