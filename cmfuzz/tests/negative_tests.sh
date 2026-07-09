@@ -167,6 +167,31 @@ else
   echo "SKIP  wolfCrypt subprocess self-tests (wolfCrypt not built; run scripts/build_wolfssl.sh — needs autotools)"
 fi
 
+# Botan subprocess differential + L3 self-tests (only if Botan amalgamation present; needs python3 + C++20).
+BOTAN_DIR="$ROOT/libs/botan"
+if [ -f "$BOTAN_DIR/botan_all.cpp" ]; then
+  BSAN="-fsanitize=address,fuzzer -g -O1 -std=c++20"
+  SUB="$ROOT/harness/subproc"
+  echo "[neg] building Botan fault-injected L3 harnesses (compiles amalgamation)..."
+  clang++ $BSAN -DCMF_FAULT_NONCE=1 -I"$BOTAN_DIR" "$SUB/seq_botan_harness.cpp" "$BOTAN_DIR/botan_all.cpp" -o "$TMP/botan_nonce" 2>/dev/null
+  clang++ $BSAN -DCMF_FAULT_RELEASE=1 -I"$BOTAN_DIR" "$SUB/seq_botan_harness.cpp" "$BOTAN_DIR/botan_all.cpp" -o "$TMP/botan_release" 2>/dev/null
+  check "L3 Botan AEAD detects nonce reuse"                 "$TMP/botan_nonce" "O6-nonce-uniqueness"
+  check "L3 Botan AEAD detects release-before-verify"       "$TMP/botan_release" "O6-release-before-verify"
+
+  echo "[neg] building Botan subprocess differential self-test..."
+  [ -x "$TMP/diff_subproc" ] || clang -g -O1 "$SUB/diff_subproc_runner.c" -I"$SUB" -lcrypto -o "$TMP/diff_subproc"
+  clang++ -std=c++20 -O1 -g -DCMF_DIFF_FAULT=1 -I"$BOTAN_DIR" -I"$SUB" "$SUB/compute_botan.cpp" "$BOTAN_DIR/botan_all.cpp" -o "$TMP/compute_botan_fault" 2>/dev/null
+  "$TMP/diff_subproc" 200 12345 botan_fault="$TMP/compute_botan_fault" > "$TMP/subout_botan.txt" 2>&1 || true
+  cat "$TMP/subout_botan.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/subout_botan.txt"; then
+    echo "PASS  Subprocess differential detects divergent Botan backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Subprocess differential Botan (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  Botan subprocess self-tests (Botan not built; run scripts/build_botan.sh — needs python3 + C++20)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

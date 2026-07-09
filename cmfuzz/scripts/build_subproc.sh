@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
-# Build the stage-2.1 subprocess differential stack (BoringSSL + aws-lc + wolfCrypt).
+# Build the stage-2.1 subprocess differential stack
+# (BoringSSL + aws-lc + wolfCrypt + Botan).
 #
 # Each extra library runs behind a standalone compute CLI driven by the runner
 # (which links OpenSSL as the reference). BoringSSL/aws-lc must be isolated
-# because they redefine OpenSSL symbols; wolfCrypt uses its own wc_* API and is
-# kept behind a subprocess for uniformity. Targets:
+# because they redefine OpenSSL symbols; wolfCrypt (wc_* API) and Botan (C++
+# Botan:: namespace) use their own APIs and are kept behind a subprocess for
+# uniformity. Targets:
 #   - diff_subproc         : runner, links OpenSSL (reference), drives CLIs.
 #   - compute_boringssl    : standalone CLI, links ONLY BoringSSL.
 #   - compute_aws_lc       : standalone CLI, links ONLY aws-lc.
 #   - compute_wolfssl      : standalone CLI, links ONLY wolfCrypt.
+#   - compute_botan        : standalone CLI, links ONLY Botan (amalgamation).
 #   - seq_boringssl        : BoringSSL EVP_AEAD L3 misuse harness (libFuzzer+ASan).
 #   - seq_aws_lc           : aws-lc   EVP_AEAD L3 misuse harness (libFuzzer+ASan).
 #   - seq_wolfssl          : wolfCrypt AES-GCM L3 misuse harness (libFuzzer+ASan).
+#   - seq_botan            : Botan AEAD_Mode L3 misuse harness (libFuzzer+ASan).
 #
 # BoringSSL/aws-lc static libs contain C++ objects, so their consumers must be
-# LINKED with clang++ even though the sources are C; wolfCrypt is pure C.
-# BoringSSL is required for this script; aws-lc (needs Go >= 1.20) and wolfCrypt
-# (needs autotools) are optional and skipped if their build fails.
+# LINKED with clang++ even though the sources are C; wolfCrypt is pure C; Botan
+# is C++. BoringSSL is required for this script; aws-lc (needs Go >= 1.20),
+# wolfCrypt (needs autotools) and Botan (needs python3 + C++20) are optional and
+# skipped if their build fails.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/build/harness"
@@ -70,6 +75,21 @@ if bash "$ROOT/scripts/build_wolfssl.sh" >/dev/null 2>&1; then
   fi
 else
   echo "[build_subproc] wolfCrypt skipped (build failed; needs autotools)" >&2
+fi
+
+# Botan backend (optional: C++, needs python3 + a C++20 compiler). Compiled
+# against the single-file amalgamation produced by build_botan.sh.
+if bash "$ROOT/scripts/build_botan.sh" >/dev/null 2>&1; then
+  BOTAN_DIR="$ROOT/libs/botan"
+  if [ -f "$BOTAN_DIR/botan_all.cpp" ]; then
+    clang++ -std=c++20 -O1 -g -I"$BOTAN_DIR" -I"$SUB" \
+      "$SUB/compute_botan.cpp" "$BOTAN_DIR/botan_all.cpp" -o "$OUT/compute_botan"
+    clang++ $SAN -std=c++20 -I"$BOTAN_DIR" \
+      "$SUB/seq_botan_harness.cpp" "$BOTAN_DIR/botan_all.cpp" -o "$OUT/seq_botan"
+    built="$built + compute_botan + seq_botan"
+  fi
+else
+  echo "[build_subproc] Botan skipped (build failed; needs python3 + C++20)" >&2
 fi
 
 echo "[build_subproc] built $built"
