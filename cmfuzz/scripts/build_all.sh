@@ -79,4 +79,7 @@ bash "$ROOT/scripts/build_java_diff.sh" || echo "[build_all] Java diff skipped (
 # Stage 3 ecosystem: TFHE-rs homomorphic-integer correctness oracle (Rust FHE,
 # independent of SEAL/OpenFHE). Optional + heavy (~2 min first compile): needs cargo.
 bash "$ROOT/scripts/build_tfhe.sh" || echo "[build_all] TFHE-rs oracle skipped (cargo missing)"
+# Stage 4 exploration: arkworks Groth16 zk-SNARK verify/circuit-consistency
+# oracle. Optional: needs cargo.
+bash "$ROOT/scripts/build_zk.sh" || echo "[build_all] ZK oracle skipped (cargo missing)"
 echo "[build_all] done"

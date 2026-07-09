@@ -7,3 +7,5 @@ libs/
 harness/rustbridge/target/
 # TFHE-rs FHE oracle build artifacts (rebuilt by build_tfhe.sh).
 harness/tfhebridge/target/
+# arkworks ZK oracle build artifacts (rebuilt by build_zk.sh).
+harness/zkbridge/target/

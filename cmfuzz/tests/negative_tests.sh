@@ -368,6 +368,23 @@ else
   echo "SKIP  TFHE-rs oracle self-test (not built; run scripts/build_tfhe.sh)"
 fi
 
+# Stage 4 exploration: arkworks Groth16 zk-SNARK oracle self-test. Only runs if
+# the oracle was already built (build_zk.sh); the base image does not build it.
+if [ -x "$ROOT/build/harness/cmf_zk" ] && command -v cargo >/dev/null 2>&1; then
+  echo "[neg] building fault-injected ZK (Groth16) oracle..."
+  bash "$ROOT/scripts/build_zk.sh" fault >/dev/null 2>&1
+  "$ROOT/build/harness/cmf_zk_fault" 1 12345 > "$TMP/zk.txt" 2>&1 || true
+  cat "$TMP/zk.txt" >&2
+  if grep -q "oracle=O_zk_groth16_verify" "$TMP/zk.txt"; then
+    echo "PASS  Groth16 oracle detects broken verifier (O_zk_groth16_verify)"; pass=$((pass+1))
+  else
+    echo "FAIL  Groth16 oracle (expected O_zk_groth16_verify)"; fail=$((fail+1))
+  fi
+  # build_zk.sh already restored the clean (non-fault) binary.
+else
+  echo "SKIP  ZK Groth16 oracle self-test (not built; run scripts/build_zk.sh)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

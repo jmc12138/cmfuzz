@@ -1,0 +1,32 @@
+[package]
+name = "cmf-zk"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# arkworks Groth16 zk-SNARK over BN254. This is the stage-4 ZK exploration: a
+# proof-verification / circuit-consistency oracle, a class of bugs the classical
+# crypto oracles do not touch (completeness + soundness of a SNARK verifier).
+[dependencies]
+ark-bn254 = "0.4"
+ark-groth16 = "0.4"
+ark-relations = "0.4"
+ark-snark = "0.4"
+ark-ff = "0.4"
+ark-std = "0.4"
+# Pin transitive deps that otherwise resolve to versions requiring Rust >= 1.85
+# (edition2024); our pinned toolchain is 1.83, matching the rest of the repo.
+zeroize = "=1.8.1"
+zeroize_derive = "=1.4.2"
+
+[features]
+# Fault injection: simulate a broken verifier (completeness bug) so the oracle
+# self-test proves it catches an "honest proof wrongly rejected" divergence.
+fault = []
+
+[[bin]]
+name = "cmf_zk"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
