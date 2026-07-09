@@ -41,6 +41,11 @@ clang $SAN -DCMF_FAULT_ETM=1 \
 clang $SAN -DCMF_FAULT_REC=1 \
   "$ROOT/harness/comp_trad_harness.c" -lcrypto -o "$TMP/rec_fault"
 
+clang $SAN -DCMF_AK_PQC=0 -DCMF_FAULT_AK=1 \
+  "$ROOT/harness/comp_authkem_harness.c" -lcrypto -o "$TMP/ak_fault"
+clang $SAN -DCMF_FAULT_KDF=1 \
+  "$ROOT/harness/comp_kdfchain_harness.c" -lcrypto -o "$TMP/kdf_fault"
+
 echo "[neg] running..."
 check "KEM correctness (MR1) detects corrupted shared secret" "$TMP/kem_fault_mr1" "MR1_correctness"
 check "SIG SUF (MR3) detects malleable-verify"                 "$TMP/sig_fault_mr3" "MR3_strong_unforgeability"
@@ -48,6 +53,8 @@ check "Traditional AEAD tamper-reject detects forged tag"     "$TMP/trad_fault" 
 check "L2 HPKE composition detects tampered encapsulated key" "$TMP/hpke_fault" "O5-upstream-tamper"
 check "L2 EtM detects tampered ciphertext/tag"                "$TMP/etm_fault" "O5-ciphertext-integrity"
 check "L2 TLS1.3 record detects wrong sequence number"        "$TMP/rec_fault" "O5-seq-binding"
+check "L2 AuthKEM detects unbound (swappable) encapsulation"  "$TMP/ak_fault" "O5-transcript-binding"
+check "L2 KDF chain detects collapsed (non-advancing) keys"   "$TMP/kdf_fault" "O5-key-separation"
 
 # Differential oracle self-test (only if the extra libs are built).
 if [ -f "$ROOT/libs/cryptopp/libcryptopp.a" ] && \

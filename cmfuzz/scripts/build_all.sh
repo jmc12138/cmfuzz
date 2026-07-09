@@ -26,6 +26,16 @@ clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1
 # L2 traditional composition: Encrypt-then-MAC (AES-CBC+HMAC) + TLS1.3-style record layer
 clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
   "$ROOT/harness/comp_trad_harness.c" -lcrypto -o "$ROOT/build/harness/comp_trad"
+# L2 authenticated KEM (KEM+signature) — classical + PQC backends
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  -DCMF_AK_PQC=0 "$ROOT/harness/comp_authkem_harness.c" -lcrypto \
+  -o "$ROOT/build/harness/comp_authkem_classic"
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  -DCMF_AK_PQC=1 -I"$ROOT/libs/liboqs/build/include" "$ROOT/harness/comp_authkem_harness.c" \
+  "$ROOT/libs/liboqs/build/lib/liboqs.a" -lcrypto -o "$ROOT/build/harness/comp_authkem_pqc"
+# L2 KDF chain / ratchet key schedule
+clang -fsanitize=address,undefined,fuzzer -fno-sanitize-recover=undefined -g -O1 \
+  "$ROOT/harness/comp_kdfchain_harness.c" -lcrypto -o "$ROOT/build/harness/comp_kdfchain"
 # Extra libraries + multi-library differential harness (optional; skipped if the
 # extra libs failed to build so a minimal setup still succeeds).
 if bash "$ROOT/scripts/build_diff_libs.sh"; then

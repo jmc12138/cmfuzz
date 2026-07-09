@@ -101,6 +101,23 @@
   - **O5-seq-binding**：用错误 seq 打开 → 必须失败（顺序/nonce 绑定）；
   - **O5-tamper**：翻转 ct/tag → 必须失败。
 
+### 2.7 L2 组合层 —— 认证 KEM（KEM+签名）与 KDF 链【新】
+**认证 KEM**（“对封装物签名”式 AKE）：发送方 KEM 封装 + 对 `enc` 签名，接收方先验签再解封装。
+
+| 靶 | 后端 | campaign | 结果 |
+|---|---|---|---|
+| `build/harness/comp_authkem_classic` | X25519 + Ed25519 | ~0.11M runs/45s | 0 违反 |
+| `build/harness/comp_authkem_pqc` | ML-KEM-768 + ML-DSA-65 | ~0.10M runs/45s | 0 违反 |
+
+- **O5-roundtrip**：验签成功 + 解封装后双方同密钥 + AEAD 记录往返一致；
+- **O5-transcript-binding**：篡改 `enc`（保留签名）→ 验签必须失败。认证 KEM 的核心就是
+  “签名必须绑定 KEM 密文”，否则攻击者可替换封装物（未绑定的 transcript）。
+
+**KDF 链 / ratchet**（`build/harness/comp_kdfchain`，~1.3M runs/60s，0 违反）：
+k₀=HKDF(ikm)、kᵢ₊₁=HKDF(kᵢ)，每消息用自己的 kᵢ 做 AES-GCM：
+- **O5-roundtrip**：消息 i 在 kᵢ 下正确解开；
+- **O5-key-separation**：用 kⱼ（j≠i）解消息 i 必须失败（链每步密钥独立；链不前进则败）。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -108,7 +125,7 @@
 | 类型 | 内容 | 状态 |
 |---|---|---|
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
-| **L2 组合(O5)** | HPKE 往返/上下文绑定/上游篡改（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定/篡改 | ✅ |
+| **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
 | 差分 | 同算法跨 4 库输出一致性 | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
@@ -127,10 +144,11 @@
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **7/7**：故障注入使以下 oracle 全部正确触发——
+`tests/negative_tests.sh` ✅ **9/9**：故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
 **L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
-**L2 TLS1.3 记录层 seq 绑定(O5-seq-binding)**、多库差分(DIFF_mismatch)。
+**L2 TLS1.3 seq 绑定(O5-seq-binding)**、**L2 认证 KEM transcript 绑定(O5-transcript-binding)**、
+**L2 KDF 链 key-separation(O5-key-separation)**、多库差分(DIFF_mismatch)。
 
 ---
 
@@ -146,6 +164,10 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（傍晚·3）：**PLAN 阶段1.3** —— 新增 **L2 认证 KEM**
+  (`comp_authkem_harness.c`，X25519+Ed25519 与 ML-KEM-768+ML-DSA-65 两后端，transcript 绑定)
+  与 **KDF 链/ratchet**(`comp_kdfchain_harness.c`，key-separation)。各 campaign 0 违反；
+  负向自测升到 **9/9**（新增 transcript-binding、key-separation）。本阶段 0 新发现。
 - 2026-07-09（傍晚·2）：**PLAN 阶段1.2** —— 新增 **L2 传统组合 harness**
   (`harness/comp_trad_harness.c`)：Encrypt-then-MAC(AES-CBC+HMAC) 密文完整性、
   TLS1.3 记录层(AES-GCM, seq nonce) 往返/seq 绑定/篡改。campaign 7.2M runs 0 违反；
