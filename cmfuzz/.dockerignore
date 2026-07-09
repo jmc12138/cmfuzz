@@ -1,0 +1,7 @@
+# Keep the build context small: liboqs/SEAL/diff libs are cloned+built inside
+# the image, and build artifacts / campaign results are regenerated.
+libs/
+build/
+results/
+**/*.o
+**/*.a
