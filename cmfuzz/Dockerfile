@@ -54,6 +54,15 @@ RUN arch="$(dpkg --print-architecture)" \
     && rm /tmp/go.tgz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
+# Rust toolchain for the stage-2.4 RustCrypto cross-language differential
+# backend (harness/rustbridge). Pinned to 1.83 so the MSRV dependency pins in
+# Cargo.toml resolve; installed under /opt/rust so it is world-usable.
+ARG RUST_VERSION=1.83.0
+ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y \
+        --no-modify-path --profile minimal --default-toolchain "${RUST_VERSION}"
+ENV PATH="/opt/rust/cargo/bin:${PATH}"
+
 WORKDIR /opt/cmfuzz
 COPY . /opt/cmfuzz
 
@@ -80,6 +89,12 @@ RUN bash scripts/build_liboqs.sh \
 # Stage 2.3 PQC cross-library differential: PQClean is a lightweight header/C
 # reference build, so we include it (and its self-test runs in negative_tests).
 RUN bash scripts/build_pqc_diff.sh
+
+# Stage 2.4 cross-language differentials: Go crypto + RustCrypto backends. Both
+# toolchains are in the image, so build both (their self-tests run in
+# negative_tests below).
+RUN bash scripts/build_go_diff.sh \
+    && bash scripts/build_rust_diff.sh
 
 # Sanity-check the oracles actually fire on injected faults at image-build time.
 RUN bash tests/negative_tests.sh

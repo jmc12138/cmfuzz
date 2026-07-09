@@ -61,4 +61,6 @@ bash "$ROOT/scripts/build_subproc.sh" || echo "[build_all] subprocess diff skipp
 bash "$ROOT/scripts/build_pqc_diff.sh" || echo "[build_all] PQC diff skipped (PQClean missing)"
 # Stage 2.4 cross-language differential (Go crypto backend). Optional: needs Go.
 bash "$ROOT/scripts/build_go_diff.sh" || echo "[build_all] Go cross-lang diff skipped (Go missing)"
+# Stage 2.4 cross-language differential (RustCrypto backend). Optional: needs cargo.
+bash "$ROOT/scripts/build_rust_diff.sh" || echo "[build_all] Rust cross-lang diff skipped (cargo missing)"
 echo "[build_all] done"

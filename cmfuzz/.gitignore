@@ -3,3 +3,5 @@ crash-*
 # (build_*.sh) and must never be committed.
 build/
 libs/
+# Rust cross-language backend build artifacts (rebuilt by build_rust_diff.sh).
+harness/rustbridge/target/

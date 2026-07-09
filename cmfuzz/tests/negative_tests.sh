@@ -228,6 +228,27 @@ else
   echo "SKIP  Go cross-language self-test (Go not installed)"
 fi
 
+# Stage 2.4 cross-language differential self-test (RustCrypto vs OpenSSL; only if
+# cargo is available).
+if command -v cargo >/dev/null 2>&1; then
+  echo "[neg] building fault-injected Rust cross-language backend..."
+  [ -x "$TMP/diff_subproc" ] || clang -g -O1 "$ROOT/harness/subproc/diff_subproc_runner.c" -I"$ROOT/harness/subproc" -lcrypto -o "$TMP/diff_subproc"
+  ( cd "$ROOT/harness/rustbridge" && cargo build --release --features fault ) >/dev/null 2>&1
+  cp "$ROOT/harness/rustbridge/target/release/compute_rust" "$TMP/compute_rust_fault"
+  "$TMP/diff_subproc" 200 12345 rust_fault="$TMP/compute_rust_fault" > "$TMP/rustout.txt" 2>&1 || true
+  cat "$TMP/rustout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/rustout.txt"; then
+    echo "PASS  Cross-language differential detects divergent Rust backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Cross-language differential Rust (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+  # Rebuild the clean (non-fault) backend so a later plain build isn't left with
+  # the fault-injected artifact in target/release.
+  ( cd "$ROOT/harness/rustbridge" && cargo build --release ) >/dev/null 2>&1 || true
+else
+  echo "SKIP  Rust cross-language self-test (cargo not installed)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]
