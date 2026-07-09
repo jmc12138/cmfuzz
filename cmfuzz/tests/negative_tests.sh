@@ -211,6 +211,23 @@ else
   echo "SKIP  PQC differential self-test (PQClean not built; run scripts/build_pqclean.sh)"
 fi
 
+# Stage 2.4 cross-language differential self-test (Go crypto vs OpenSSL; only if
+# Go is available).
+if command -v go >/dev/null 2>&1; then
+  echo "[neg] building fault-injected Go cross-language backend..."
+  [ -x "$TMP/diff_subproc" ] || clang -g -O1 "$ROOT/harness/subproc/diff_subproc_runner.c" -I"$ROOT/harness/subproc" -lcrypto -o "$TMP/diff_subproc"
+  ( cd "$ROOT/harness/gobridge" && GOFLAGS=-mod=mod go build -ldflags "-X main.faultMode=1" -o "$TMP/compute_go_fault" . ) 2>/dev/null
+  "$TMP/diff_subproc" 200 12345 go_fault="$TMP/compute_go_fault" > "$TMP/goout.txt" 2>&1 || true
+  cat "$TMP/goout.txt" >&2
+  if grep -q "oracle=DIFF_mismatch" "$TMP/goout.txt"; then
+    echo "PASS  Cross-language differential detects divergent Go backend (DIFF_mismatch)"; pass=$((pass+1))
+  else
+    echo "FAIL  Cross-language differential Go (expected DIFF_mismatch)"; fail=$((fail+1))
+  fi
+else
+  echo "SKIP  Go cross-language self-test (Go not installed)"
+fi
+
 echo "[neg] $pass passed, $fail failed"
 rm -rf "$TMP"
 [ "$fail" -eq 0 ]

@@ -274,6 +274,20 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
 - 实测 **liboqs↔PQClean 双向 5000 迭代（ML-KEM-768 KEM + ML-DSA-65 sign/verify）全一致**
   （seed 42×2000 + 777×5000），故障注入自测正确触发 `O1_kem_interop`。
 
+### 2.14 阶段 2.4 —— 跨语言差分（Go crypto vs OpenSSL）【新】
+把差分从"跨 C 库"扩展到"跨语言"：新增 Go 后端 `harness/gobridge`，与 stage 2.1 的子进程
+runner（`diff_subproc`）说**同一套线协议**（stdin 每行 `<op> <hex>`，stdout 每行 hex/`01`/`00`/
+`NA`/`ERR`），但用 **Go 标准库 + golang.org/x/crypto** 而非 C 库实现全部 15 个 op。Go 的密码栈是
+独立实现血统（非 OpenSSL/BoringSSL 派生），故与 OpenSSL 参照逐字节一致是**真正的跨语言 O1 差分**。
+- **覆盖**：op0–14 全部——SHA-256/512、HMAC、ChaCha20-Poly1305、AES-256-GCM、SHA3-256/512、
+  SHAKE128/256、HKDF、PBKDF2、Ed25519 签名、X25519、ECDSA-P256 验签互操作、RSA-PSS 验签互操作。
+  ChaCha/SHA3/SHAKE/HKDF/PBKDF2/X25519 走 `x/crypto`（v0.17.0，pin 在 `harness/gobridge/go.mod`），
+  其余走 Go stdlib。ECDSA 用 `ecdsa.VerifyASN1`（直接吃 DER），RSA-PSS 用 `rsa.VerifyPSS`
+  （saltlen=32、SHA-256），与 op13/op14 的裸模数/SEC1 点编码约定一致。
+- **构建**：`scripts/build_go_diff.sh` 编 runner + Go 后端；`faultMode=1`（ldflags 注入）出故障自测变体。
+- 实测 **Go↔OpenSSL 11000 向量全一致**（seed 42×6000 + 777×5000，覆盖全部 15 op），故障注入
+  正确触发 `DIFF_mismatch`。
+
 ---
 
 ## 3. 已跑通的检测能力（oracle）
@@ -283,7 +297,7 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
 | 功能 metamorphic | KEM 正确性、SIG EUF/SUF、AEAD 往返/篡改拒绝、错误密钥 | ✅ |
 | **L2 组合(O5)** | HPKE（X25519+ML-KEM-768）；EtM 密文完整性；TLS1.3 记录层 seq 绑定；认证 KEM transcript 绑定（古典+PQC）；KDF 链 key-separation | ✅ |
 | **L3 序列/误用(O6)** | AES-256-GCM：灾难性 nonce 复用、AEAD 未验证明文释放；ECDSA-P256 签名 nonce(k) 复用→私钥恢复；ML-KEM-768 密钥混淆免虚假协商；AES-256-CBC：可预测/复用 IV；EVP 上下文 use-after-free；**BoringSSL + aws-lc EVP_AEAD + wolfCrypt/Botan AES-GCM：nonce 复用、release-before-verify** | ✅ |
-| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL + aws-lc + wolfCrypt + Botan 独立子进程差分**（`diff_subproc`，op0–14＝哈希/HMAC/AEAD + SHA-3/SHAKE + HKDF/PBKDF2 + Ed25519/X25519 + ECDSA-P256/RSA-PSS 验签互操作，vs OpenSSL 五方一致）；**PQC 跨库 O1 差分 liboqs↔PQClean**（ML-KEM-768 KEM 互操作 + ML-DSA-65 验签互操作，双向） | ✅ |
+| 差分 | 同算法跨 4 库输出一致性（同进程）；**BoringSSL + aws-lc + wolfCrypt + Botan 独立子进程差分**（`diff_subproc`，op0–14＝哈希/HMAC/AEAD + SHA-3/SHAKE + HKDF/PBKDF2 + Ed25519/X25519 + ECDSA-P256/RSA-PSS 验签互操作，vs OpenSSL 五方一致）；**PQC 跨库 O1 差分 liboqs↔PQClean**（ML-KEM-768 KEM 互操作 + ML-DSA-65 验签互操作，双向）；**跨语言 O1 差分 Go crypto↔OpenSSL**（`diff_subproc` go 后端，op0–14 全覆盖） | ✅ |
 | 内存安全 | ASan + UBSan（全靶插桩） | ✅ |
 | 常量时间 | dudect（Welch t，|t|>4.5）：**PQC**—ML-KEM decaps、Kyber768 decaps、ML-DSA-65 sign、Falcon-512 sign；**传统**—AES-256 块加密、CRYPTO_memcmp、naive_memcmp | ✅ |
 
@@ -301,11 +315,11 @@ RFC 8032 纯 Ed25519 确定性，故字节级可比）、op12 **X25519**（scala
 ---
 
 ## 4. 自测（证明"0 违反"不是空转）
-`tests/negative_tests.sh` ✅ **28/28**（含差分库 + BoringSSL + aws-lc + wolfCrypt + Botan + PQClean；
-只到 Botan 27；只到 wolfCrypt 24；只到 aws-lc 21；只到 BoringSSL 18；仅差分库 15；最小 14）：
+`tests/negative_tests.sh` ✅ **29/29**（含差分库 + BoringSSL + aws-lc + wolfCrypt + Botan + PQClean + Go；
+无 Go 时 28；只到 Botan 27；只到 wolfCrypt 24；只到 aws-lc 21；只到 BoringSSL 18；仅差分库 15；最小 14）：
 BoringSSL / aws-lc / wolfCrypt / Botan 各贡献 **L3 nonce 复用 + release-before-verify + 子进程 DIFF_mismatch**
-三项，PQClean 贡献 **PQC 跨库差分 O1_kem_interop**（各自仅在对应库已编时运行，否则 SKIP）。
-故障注入使以下 oracle 全部正确触发——
+三项，PQClean 贡献 **PQC 跨库差分 O1_kem_interop**，Go 贡献 **跨语言差分 DIFF_mismatch**
+（各自仅在对应库/工具链可用时运行，否则 SKIP）。故障注入使以下 oracle 全部正确触发——
 KEM 正确性(MR1)、SIG 强不可伪造(MR3)、传统 AEAD 篡改拒绝(tamper_reject)、
 **L2 HPKE 上游篡改(O5-upstream-tamper)**、**L2 EtM 密文完整性(O5-ciphertext-integrity)**、
 **L2 TLS1.3 seq 绑定(O5-seq-binding)**、**L2 认证 KEM transcript 绑定(O5-transcript-binding)**、
@@ -329,6 +343,12 @@ scripts/run_ct.sh               # 常量时间检测
 ---
 
 ## 6. 变更记录
+- 2026-07-09（夜·11）：**PLAN 阶段2.4（跨语言差分 Go crypto vs OpenSSL）** —— 把差分从跨 C 库
+  扩到跨语言。新增 Go 后端 `harness/gobridge`（Go stdlib + x/crypto v0.17.0，pin 在 go.mod），复用
+  stage 2.1 的 `diff_subproc` 线协议，实现全部 15 个 op（op0–14）。Go 密码栈独立血统，与 OpenSSL
+  参照逐字节一致＝真正的跨语言 O1 差分。`scripts/build_go_diff.sh` 编 runner + Go 后端
+  （`faultMode=1` 出故障自测变体）。**Go↔OpenSSL 11000 向量全一致**（seed 42×6000 + 777×5000）；
+  负向自测升 **29/29**（新增跨语言 DIFF_mismatch 故障注入）。build_all 已接入。本阶段 0 新发现。
 - 2026-07-09（夜·10）：**PLAN 阶段2.3（PQC 跨库差分 liboqs vs PQClean）** —— 补上 PQC 缺的 O1
   跨实现差分（此前仅 O2）。接 PQClean 参照实现，对 ML-KEM-768（FIPS 203）、ML-DSA-65（FIPS 204）
   与 liboqs 做差分。因 KEM encaps / ML-DSA 签名随机化、字节不可比，用互操作 oracle：KEM 双向

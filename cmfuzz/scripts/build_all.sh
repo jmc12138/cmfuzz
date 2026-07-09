@@ -59,4 +59,6 @@ fi
 bash "$ROOT/scripts/build_subproc.sh" || echo "[build_all] subprocess diff skipped (BoringSSL/Go missing)"
 # Stage 2.3 PQC cross-library differential (liboqs vs PQClean). Optional.
 bash "$ROOT/scripts/build_pqc_diff.sh" || echo "[build_all] PQC diff skipped (PQClean missing)"
+# Stage 2.4 cross-language differential (Go crypto backend). Optional: needs Go.
+bash "$ROOT/scripts/build_go_diff.sh" || echo "[build_all] Go cross-lang diff skipped (Go missing)"
 echo "[build_all] done"
