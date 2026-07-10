@@ -1,0 +1,3 @@
+[pqc-diff] ML-KEM-768 KEM interop: 20000 iters, both directions agree
+[pqc-diff] ML-DSA-65 sign/verify interop: 20000 iters, both directions agree
+[pqc-diff] all liboqs<->PQClean differentials agree

@@ -1,0 +1,23 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 904439977
+INFO: Loaded 1 modules   (52 inline 8-bit counters): 52 [0x562f22195720, 0x562f22195754), 
+INFO: Loaded 1 PC tables (52 PCs): 52 [0x562f22195758,0x562f22195a98), 
+INFO:        0 files found in results/analysis/campaign/corpus_comp_authkem_pqc
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 31Mb
+	NEW_FUNC[1/1]: 0x562f211a4cd0 in hkdf32 /home/ubuntu/cmfuzz/cmfuzz/harness/comp_authkem_harness.c:56
+#4	NEW    cov: 10 ft: 11 corp: 2/3b lim: 4 exec/s: 0 rss: 38Mb L: 2/2 MS: 1 CopyPart-
+#6	NEW    cov: 10 ft: 12 corp: 3/7b lim: 4 exec/s: 0 rss: 38Mb L: 4/4 MS: 2 ShuffleBytes-CMP- DE: "key"-
+#25	NEW    cov: 10 ft: 13 corp: 4/10b lim: 4 exec/s: 0 rss: 40Mb L: 3/4 MS: 4 ShuffleBytes-ChangeBit-CopyPart-InsertByte-
+#234	NEW    cov: 10 ft: 14 corp: 5/15b lim: 6 exec/s: 0 rss: 57Mb L: 5/5 MS: 4 PersAutoDict-CrossOver-CopyPart-PersAutoDict- DE: "key"-"key"-
+#749	NEW    cov: 10 ft: 15 corp: 6/25b lim: 11 exec/s: 0 rss: 101Mb L: 10/10 MS: 5 ChangeByte-InsertByte-EraseBytes-ChangeByte-InsertRepeatedBytes-
+#1061	REDUCE cov: 10 ft: 15 corp: 6/24b lim: 14 exec/s: 0 rss: 128Mb L: 9/9 MS: 2 CMP-EraseBytes- DE: "\377\377\377\030"-
+#1391	NEW    cov: 10 ft: 16 corp: 7/41b lim: 17 exec/s: 0 rss: 157Mb L: 17/17 MS: 5 CMP-CrossOver-ChangeBit-CrossOver-CrossOver- DE: "use_derivat"-
+#3035	NEW    cov: 10 ft: 17 corp: 8/74b lim: 33 exec/s: 3035 rss: 304Mb L: 33/33 MS: 4 InsertByte-InsertRepeatedBytes-CopyPart-CMP- DE: "iv"-
+#4096	pulse  cov: 10 ft: 17 corp: 8/74b lim: 43 exec/s: 2048 rss: 388Mb
+#8192	pulse  cov: 10 ft: 17 corp: 8/74b lim: 80 exec/s: 2730 rss: 390Mb
+#13350	NEW    cov: 10 ft: 18 corp: 9/203b lim: 135 exec/s: 2225 rss: 390Mb L: 129/129 MS: 5 CrossOver-ShuffleBytes-ChangeByte-InsertRepeatedBytes-CopyPart-
+#16384	pulse  cov: 10 ft: 18 corp: 9/203b lim: 163 exec/s: 2340 rss: 390Mb
+#32768	pulse  cov: 10 ft: 18 corp: 9/203b lim: 325 exec/s: 2340 rss: 390Mb
+==29110== libFuzzer: run interrupted; exiting

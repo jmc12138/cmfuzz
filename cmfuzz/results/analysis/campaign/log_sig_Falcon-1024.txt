@@ -1,0 +1,18 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2591725996
+INFO: Loaded 1 modules   (70 inline 8-bit counters): 70 [0x55ffdaa78f80, 0x55ffdaa78fc6), 
+INFO: Loaded 1 PC tables (70 PCs): 70 [0x55ffdaa78fc8,0x55ffdaa79428), 
+INFO:        0 files found in results/analysis/campaign/corpus_sig_Falcon-1024
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 31Mb
+	NEW_FUNC[1/2]: 0x55ffd9d9a9d0 in cmf_u8 /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x55ffd9d9abc0 in cmf_randombytes /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:44
+#430	NEW    cov: 20 ft: 21 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 3 InsertByte-ShuffleBytes-InsertRepeatedBytes-
+#441	NEW    cov: 24 ft: 28 corp: 3/17b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 1 CMP- DE: "\000\000\000\000\000\000\000\000"-
+#512	pulse  cov: 24 ft: 28 corp: 3/17b lim: 8 exec/s: 256 rss: 34Mb
+#747	NEW    cov: 24 ft: 30 corp: 4/26b lim: 11 exec/s: 74 rss: 36Mb L: 9/9 MS: 1 InsertByte-
+#757	NEW    cov: 24 ft: 31 corp: 5/36b lim: 11 exec/s: 75 rss: 36Mb L: 10/10 MS: 5 PersAutoDict-ChangeBinInt-ChangeBit-ShuffleBytes-InsertByte- DE: "\000\000\000\000\000\000\000\000"-
+#1024	pulse  cov: 24 ft: 31 corp: 5/36b lim: 11 exec/s: 51 rss: 39Mb
+#1069	NEW    cov: 24 ft: 34 corp: 6/50b lim: 14 exec/s: 50 rss: 40Mb L: 14/14 MS: 2 CopyPart-CrossOver-
+==28770== libFuzzer: run interrupted; exiting

@@ -1,0 +1,25 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2964661795
+INFO: Loaded 1 modules   (27 inline 8-bit counters): 27 [0x556e7f7951a0, 0x556e7f7951bb), 
+INFO: Loaded 1 PC tables (27 PCs): 27 [0x556e7f7951c0,0x556e7f795370), 
+INFO:        0 files found in results/analysis/campaign/corpus_seq_ecdsa
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/1]: 0x556e7f753200 in ecdsa_sign /home/ubuntu/cmfuzz/cmfuzz/harness/seq_ecdsa_harness.c:44
+#26	NEW    cov: 13 ft: 14 corp: 2/5b lim: 4 exec/s: 0 rss: 36Mb L: 4/4 MS: 3 InsertByte-InsertByte-InsertByte-
+#237	NEW    cov: 13 ft: 15 corp: 3/10b lim: 6 exec/s: 0 rss: 38Mb L: 5/5 MS: 1 InsertByte-
+#750	NEW    cov: 13 ft: 16 corp: 4/19b lim: 11 exec/s: 0 rss: 45Mb L: 9/9 MS: 3 EraseBytes-EraseBytes-InsertRepeatedBytes-
+#1399	NEW    cov: 13 ft: 17 corp: 5/36b lim: 17 exec/s: 0 rss: 54Mb L: 17/17 MS: 4 EraseBytes-InsertRepeatedBytes-CrossOver-InsertByte-
+#3032	NEW    cov: 13 ft: 18 corp: 6/69b lim: 33 exec/s: 0 rss: 78Mb L: 33/33 MS: 3 CopyPart-InsertRepeatedBytes-CopyPart-
+#13541	NEW    cov: 13 ft: 19 corp: 7/204b lim: 135 exec/s: 13541 rss: 246Mb L: 135/135 MS: 4 InsertRepeatedBytes-InsertRepeatedBytes-InsertByte-CopyPart-
+#13857	REDUCE cov: 13 ft: 19 corp: 7/201b lim: 135 exec/s: 13857 rss: 251Mb L: 132/132 MS: 1 EraseBytes-
+#13925	REDUCE cov: 13 ft: 19 corp: 7/200b lim: 135 exec/s: 13925 rss: 253Mb L: 131/131 MS: 3 InsertByte-EraseBytes-InsertRepeatedBytes-
+#15136	REDUCE cov: 13 ft: 19 corp: 7/198b lim: 142 exec/s: 7568 rss: 272Mb L: 129/129 MS: 1 EraseBytes-
+#16384	pulse  cov: 13 ft: 19 corp: 7/198b lim: 149 exec/s: 8192 rss: 293Mb
+#27515	REDUCE cov: 13 ft: 20 corp: 8/456b lim: 261 exec/s: 9171 rss: 453Mb L: 258/258 MS: 4 CrossOver-CopyPart-InsertRepeatedBytes-CopyPart-
+#27621	NEW    cov: 13 ft: 21 corp: 9/715b lim: 261 exec/s: 6905 rss: 453Mb L: 259/259 MS: 1 InsertByte-
+#32768	pulse  cov: 13 ft: 21 corp: 9/715b lim: 309 exec/s: 8192 rss: 454Mb
+#65536	pulse  cov: 13 ft: 21 corp: 9/715b lim: 634 exec/s: 7281 rss: 455Mb
+#131072	pulse  cov: 13 ft: 21 corp: 9/715b lim: 1280 exec/s: 6898 rss: 456Mb
+==29250== libFuzzer: run interrupted; exiting

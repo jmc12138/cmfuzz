@@ -1,4 +1,11 @@
 crash-*
+# Python bytecode caches.
+__pycache__/
+*.pyc
+# libFuzzer working dirs (regenerated every run): keep only the log_*.txt and
+# summary.txt under results/, never the corpus/crash seed directories.
+results/**/corpus_*/
+results/**/crash_*/
 # Build artifacts and cloned third-party libraries are rebuilt by scripts
 # (build_*.sh) and must never be committed.
 build/

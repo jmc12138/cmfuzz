@@ -1,0 +1,29 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2220569578
+INFO: Loaded 1 modules   (47 inline 8-bit counters): 47 [0x5611846e0150, 0x5611846e017f), 
+INFO: Loaded 1 PC tables (47 PCs): 47 [0x5611846e0180,0x5611846e0470), 
+INFO:        0 files found in results/analysis/campaign/corpus_seq_evp
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/2]: 0x56118469e670 in cmf_rest /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:73
+	NEW_FUNC[2/2]: 0x56118469e890 in cbc_enc /home/ubuntu/cmfuzz/cmfuzz/harness/seq_evp_harness.c:43
+#7	NEW    cov: 17 ft: 18 corp: 2/3b lim: 4 exec/s: 0 rss: 36Mb L: 2/2 MS: 4 ShuffleBytes-ChangeBit-ChangeByte-CopyPart-
+#12	NEW    cov: 22 ft: 23 corp: 3/5b lim: 4 exec/s: 0 rss: 36Mb L: 2/2 MS: 5 ChangeByte-ChangeBit-CrossOver-ChangeByte-ChangeBit-
+#14	NEW    cov: 22 ft: 24 corp: 4/9b lim: 4 exec/s: 0 rss: 36Mb L: 4/4 MS: 2 ChangeBinInt-CrossOver-
+#23	NEW    cov: 22 ft: 25 corp: 5/12b lim: 4 exec/s: 0 rss: 36Mb L: 3/4 MS: 4 ChangeBit-ShuffleBytes-InsertByte-CrossOver-
+#232	NEW    cov: 22 ft: 26 corp: 6/17b lim: 6 exec/s: 0 rss: 36Mb L: 5/5 MS: 4 ChangeBit-InsertByte-EraseBytes-InsertRepeatedBytes-
+#746	NEW    cov: 22 ft: 27 corp: 7/26b lim: 11 exec/s: 0 rss: 37Mb L: 9/9 MS: 4 ChangeByte-ChangeBinInt-ChangeByte-InsertRepeatedBytes-
+#1379	NEW    cov: 22 ft: 28 corp: 8/43b lim: 17 exec/s: 0 rss: 38Mb L: 17/17 MS: 3 ShuffleBytes-ChangeBinInt-InsertRepeatedBytes-
+#3024	NEW    cov: 22 ft: 29 corp: 9/76b lim: 33 exec/s: 0 rss: 40Mb L: 33/33 MS: 5 CrossOver-CrossOver-CrossOver-InsertByte-CrossOver-
+#13381	NEW    cov: 22 ft: 30 corp: 10/208b lim: 135 exec/s: 0 rss: 53Mb L: 132/132 MS: 2 CMP-InsertRepeatedBytes- DE: "\242B\3222\022\225%V\220Y\321u=<=\350\235y\021`\032\330\242z\234\213x\256\237\245\244]\011\367\024`\356Y\212\227`\3436G\311\274\017\234|\251\006\230m\014M\360\000\234Z\213j\262\337J"-
+#18743	REDUCE cov: 22 ft: 30 corp: 10/206b lim: 184 exec/s: 0 rss: 60Mb L: 130/130 MS: 2 ChangeBinInt-CrossOver-
+#21283	REDUCE cov: 22 ft: 30 corp: 10/205b lim: 205 exec/s: 0 rss: 63Mb L: 129/129 MS: 5 CMP-CopyPart-ChangeByte-CrossOver-PersAutoDict- DE: "/[2\307A-\253\031\331\331\263I\250ka\354\246\323\022\237}\344\245\243\35441\244\272s\236\301sT4\325\326\210`3X\315NV1\247E\276\010\233\002\355\322,\323bB\032\337f\304\241\260\266"-"\242B\3222\022\225%V\220Y\321u=<=\350\235y\021`\032\330\242z\234\213x\256\237\245\244]\011\367\024`\356Y\212\227`\3436G\311\274\017\234|\251\006\230m\014M\360\000\234Z\213j\262\337J"-
+#27028	REDUCE cov: 23 ft: 31 corp: 11/464b lim: 261 exec/s: 0 rss: 71Mb L: 259/259 MS: 5 EraseBytes-InsertRepeatedBytes-ShuffleBytes-ShuffleBytes-InsertRepeatedBytes-
+#29488	NEW    cov: 24 ft: 32 corp: 12/724b lim: 285 exec/s: 0 rss: 74Mb L: 260/260 MS: 5 CrossOver-CopyPart-PersAutoDict-PersAutoDict-InsertRepeatedBytes- DE: "\242B\3222\022\225%V\220Y\321u=<=\350\235y\021`\032\330\242z\234\213x\256\237\245\244]\011\367\024`\356Y\212\227`\3436G\311\274\017\234|\251\006\230m\014M\360\000\234Z\213j\262\337J"-"/[2\307A-\253\031\331\331\263I\250ka\354\246\323\022\237}\344\245\243\35441\244\272s\236\301sT4\325\326\210`3X\315NV1\247E\276\010\233\002\355\322,\323bB\032\337f\304\241\260\266"-
+#30793	REDUCE cov: 24 ft: 32 corp: 12/722b lim: 293 exec/s: 0 rss: 76Mb L: 258/259 MS: 5 CrossOver-CopyPart-EraseBytes-CopyPart-InsertByte-
+#41533	REDUCE cov: 24 ft: 32 corp: 12/721b lim: 397 exec/s: 0 rss: 91Mb L: 258/258 MS: 5 CrossOver-CMP-PersAutoDict-PersAutoDict-InsertByte- DE: "\021m\236\234\224\262g\205D\237p\217<A\362\241\272#NqrCX\275\323i\367\271\205\331]\230\013\337\007\004\307?\277\252\276\323\247\177\202\322#\011\304\236\013\337SF\257W\036Pm\354\324\246\326\036"-"/[2\307A-\253\031\331\331\263I\250ka\354\246\323\022\237}\344\245\243\35441\244\272s\236\301sT4\325\326\210`3X\315NV1\247E\276\010\233\002\355\322,\323bB\032\337f\304\241\260\266"-"\242B\3222\022\225%V\220Y\321u=<=\350\235y\021`\032\330\242z\234\213x\256\237\245\244]\011\367\024`\356Y\212\227`\3436G\311\274\017\234|\251\006\230m\014M\360\000\234Z\213j\262\337J"-
+#1048576	pulse  cov: 24 ft: 32 corp: 12/721b lim: 4096 exec/s: 349525 rss: 403Mb
+#2097152	pulse  cov: 24 ft: 32 corp: 12/721b lim: 4096 exec/s: 349525 rss: 403Mb
+#4194304	pulse  cov: 24 ft: 32 corp: 12/721b lim: 4096 exec/s: 322638 rss: 403Mb
+==29294== libFuzzer: run interrupted; exiting

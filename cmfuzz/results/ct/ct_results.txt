@@ -1,6 +1,9 @@
-CMF_CT alg=ML-KEM-512 op=decaps meas=200000 max_t=1.81 cut=55248 verdict=OK
-CMF_CT alg=ML-KEM-768 op=decaps meas=200000 max_t=4.90 cut=54400 verdict=LEAK
-CMF_CT alg=ML-KEM-1024 op=decaps meas=200000 max_t=2.04 cut=89966 verdict=OK
-CMF_CT alg=Kyber768 op=decaps meas=200000 max_t=4.21 cut=35592 verdict=OK
-CMF_CT alg=ML-DSA-65 op=sign meas=200000 max_t=15.72 cut=211044 verdict=LEAK
-CMF_CT alg=Falcon-512 op=sign meas=200000 max_t=5.57 cut=2331084 verdict=LEAK
+CMF_CT alg=ML-KEM-512 op=decaps meas=200000 max_t=1.75 cut=37148 verdict=OK
+CMF_CT alg=ML-KEM-768 op=decaps meas=200000 max_t=2.21 cut=53114 verdict=OK
+CMF_CT alg=ML-KEM-1024 op=decaps meas=200000 max_t=2.77 cut=64096 verdict=OK
+CMF_CT alg=Kyber768 op=decaps meas=200000 max_t=3.45 cut=35552 verdict=OK
+CMF_CT alg=ML-DSA-65 op=sign meas=200000 max_t=7.90 cut=194370 verdict=LEAK
+CMF_CT alg=Falcon-512 op=sign meas=200000 max_t=11.01 cut=2246524 verdict=LEAK
+CMF_CT alg=traditional op=aes256_enc meas=200000 max_t=3.72 cut=322 verdict=OK
+CMF_CT alg=traditional op=crypto_memcmp meas=200000 max_t=0.33 cut=44 verdict=OK
+CMF_CT alg=traditional op=naive_memcmp meas=200000 max_t=705.67 cut=62 verdict=LEAK

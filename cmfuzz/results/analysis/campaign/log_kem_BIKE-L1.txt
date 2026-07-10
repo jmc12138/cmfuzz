@@ -1,0 +1,23 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2813432455
+INFO: Loaded 1 modules   (65 inline 8-bit counters): 65 [0x5602ec309d00, 0x5602ec309d41), 
+INFO: Loaded 1 PC tables (65 PCs): 65 [0x5602ec309d48,0x5602ec30a158), 
+INFO:        0 files found in results/analysis/campaign/corpus_kem_BIKE-L1
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 31Mb
+	NEW_FUNC[1/2]: 0x5602ebe8e8f0 in cmf_u8 /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x5602ebe8eae0 in cmf_randombytes /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:44
+#438	NEW    cov: 17 ft: 18 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 1 InsertRepeatedBytes-
+#462	NEW    cov: 19 ft: 20 corp: 3/17b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 4 InsertByte-InsertByte-InsertRepeatedBytes-CrossOver-
+#480	NEW    cov: 20 ft: 24 corp: 4/25b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 3 ChangeBit-ChangeBit-CMP- DE: "\000\000\000\000\000\000\000\000"-
+#791	NEW    cov: 20 ft: 25 corp: 5/36b lim: 11 exec/s: 395 rss: 38Mb L: 11/11 MS: 1 CrossOver-
+#809	NEW    cov: 20 ft: 26 corp: 6/45b lim: 11 exec/s: 404 rss: 38Mb L: 9/11 MS: 3 ChangeBit-ChangeBinInt-CopyPart-
+#852	REDUCE cov: 20 ft: 26 corp: 6/44b lim: 11 exec/s: 284 rss: 39Mb L: 10/10 MS: 3 ChangeBinInt-ChangeByte-EraseBytes-
+#1024	pulse  cov: 20 ft: 26 corp: 6/44b lim: 11 exec/s: 256 rss: 42Mb
+#1162	NEW    cov: 20 ft: 27 corp: 7/58b lim: 14 exec/s: 193 rss: 43Mb L: 14/14 MS: 5 EraseBytes-ChangeBit-ChangeBit-InsertRepeatedBytes-InsertByte-
+#2048	pulse  cov: 20 ft: 27 corp: 7/58b lim: 21 exec/s: 136 rss: 60Mb
+#2285	NEW    cov: 20 ft: 28 corp: 8/82b lim: 25 exec/s: 126 rss: 64Mb L: 24/24 MS: 3 ChangeBinInt-ChangeBit-InsertRepeatedBytes-
+#2290	REDUCE cov: 20 ft: 28 corp: 8/81b lim: 25 exec/s: 127 rss: 64Mb L: 23/23 MS: 5 ChangeBinInt-EraseBytes-EraseBytes-PersAutoDict-CrossOver- DE: "\000\000\000\000\000\000\000\000"-
+#2346	REDUCE cov: 20 ft: 28 corp: 8/80b lim: 25 exec/s: 123 rss: 65Mb L: 22/22 MS: 1 EraseBytes-
+==28514== libFuzzer: run interrupted; exiting

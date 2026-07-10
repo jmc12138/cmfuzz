@@ -1,0 +1,23 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1473420522
+INFO: Loaded 1 modules   (23 inline 8-bit counters): 23 [0x559062509a60, 0x559062509a77), 
+INFO: Loaded 1 PC tables (23 PCs): 23 [0x559062509a78,0x559062509be8), 
+INFO:        0 files found in results/analysis/campaign/corpus_seq_pqc_kem
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 32Mb
+#527	NEW    cov: 5 ft: 5 corp: 2/9b lim: 8 exec/s: 0 rss: 37Mb L: 8/8 MS: 4 InsertRepeatedBytes-ChangeByte-ChangeByte-InsertRepeatedBytes-
+#838	NEW    cov: 5 ft: 6 corp: 3/18b lim: 11 exec/s: 0 rss: 40Mb L: 9/9 MS: 1 CMP- DE: "u9\001\000 `\000\000"-
+#1455	NEW    cov: 5 ft: 7 corp: 4/35b lim: 17 exec/s: 0 rss: 50Mb L: 17/17 MS: 2 CopyPart-CMP- DE: "\007\000\000\000\000\000\000\000"-
+#3088	NEW    cov: 5 ft: 8 corp: 5/68b lim: 33 exec/s: 0 rss: 81Mb L: 33/33 MS: 3 InsertByte-CopyPart-InsertRepeatedBytes-
+#13420	NEW    cov: 5 ft: 9 corp: 6/200b lim: 135 exec/s: 13420 rss: 291Mb L: 132/132 MS: 2 CopyPart-InsertRepeatedBytes-
+#13532	REDUCE cov: 5 ft: 9 corp: 6/199b lim: 135 exec/s: 13532 rss: 293Mb L: 131/131 MS: 2 EraseBytes-InsertRepeatedBytes-
+#13691	REDUCE cov: 5 ft: 9 corp: 6/197b lim: 135 exec/s: 13691 rss: 296Mb L: 129/129 MS: 4 EraseBytes-InsertByte-CrossOver-CopyPart-
+#26539	NEW    cov: 5 ft: 10 corp: 7/455b lim: 261 exec/s: 13269 rss: 376Mb L: 258/258 MS: 3 InsertRepeatedBytes-InsertRepeatedBytes-InsertRepeatedBytes-
+#26558	NEW    cov: 5 ft: 11 corp: 8/714b lim: 261 exec/s: 13279 rss: 376Mb L: 259/259 MS: 4 ChangeBinInt-ChangeBinInt-ShuffleBytes-InsertByte-
+#26559	NEW    cov: 5 ft: 12 corp: 9/974b lim: 261 exec/s: 13279 rss: 376Mb L: 260/260 MS: 1 InsertByte-
+#32768	pulse  cov: 5 ft: 12 corp: 9/974b lim: 317 exec/s: 10922 rss: 377Mb
+#65536	pulse  cov: 5 ft: 12 corp: 9/974b lim: 643 exec/s: 10922 rss: 379Mb
+#131072	pulse  cov: 5 ft: 12 corp: 9/974b lim: 1300 exec/s: 10922 rss: 379Mb
+==29337== libFuzzer: run interrupted; exiting
+==29337== libFuzzer: run interrupted; exiting

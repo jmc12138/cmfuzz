@@ -1,0 +1,38 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2393185464
+INFO: Loaded 1 modules   (97 inline 8-bit counters): 97 [0x55a9bd11e7b0, 0x55a9bd11e811), 
+INFO: Loaded 1 PC tables (97 PCs): 97 [0x55a9bd11e818,0x55a9bd11ee28), 
+INFO:        0 files found in results/analysis/campaign/corpus_comp_trad
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/3]: 0x55a9bd0da5b0 in cmf_u8 /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/3]: 0x55a9bd0da7a0 in cmf_rest /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:73
+#5	NEW    cov: 19 ft: 20 corp: 2/4b lim: 4 exec/s: 0 rss: 36Mb L: 3/3 MS: 2 InsertByte-InsertByte-
+#26	NEW    cov: 19 ft: 21 corp: 3/8b lim: 4 exec/s: 0 rss: 36Mb L: 4/4 MS: 1 InsertByte-
+	NEW_FUNC[1/1]: 0x55a9bd0da9c0 in rec_open /home/ubuntu/cmfuzz/cmfuzz/harness/comp_trad_harness.c:92
+#35	NEW    cov: 32 ft: 36 corp: 4/11b lim: 4 exec/s: 0 rss: 36Mb L: 3/4 MS: 3 CopyPart-InsertByte-InsertByte-
+#54	NEW    cov: 32 ft: 38 corp: 5/15b lim: 4 exec/s: 0 rss: 36Mb L: 4/4 MS: 4 CopyPart-ChangeBit-ChangeByte-CMP- DE: "\001\000\000\000"-
+#265	NEW    cov: 32 ft: 39 corp: 6/20b lim: 6 exec/s: 0 rss: 37Mb L: 5/5 MS: 1 InsertRepeatedBytes-
+#777	NEW    cov: 32 ft: 40 corp: 7/30b lim: 11 exec/s: 0 rss: 41Mb L: 10/10 MS: 2 ShuffleBytes-CMP- DE: "keylen"-
+#892	REDUCE cov: 32 ft: 40 corp: 7/29b lim: 11 exec/s: 0 rss: 42Mb L: 9/9 MS: 5 CMP-InsertByte-PersAutoDict-ShuffleBytes-EraseBytes- DE: "\000\000\000\000\000\000\000\000"-"\001\000\000\000"-
+#1515	NEW    cov: 32 ft: 41 corp: 8/46b lim: 17 exec/s: 0 rss: 46Mb L: 17/17 MS: 3 ChangeBit-PersAutoDict-PersAutoDict- DE: "\001\000\000\000"-"\000\000\000\000\000\000\000\000"-
+#3172	NEW    cov: 32 ft: 42 corp: 9/79b lim: 33 exec/s: 0 rss: 58Mb L: 33/33 MS: 2 ChangeBit-InsertRepeatedBytes-
+#13487	NEW    cov: 32 ft: 43 corp: 10/212b lim: 135 exec/s: 0 rss: 125Mb L: 133/133 MS: 5 ChangeBinInt-InsertByte-ChangeByte-CMP-InsertRepeatedBytes- DE: "tls-ma"-
+#13751	REDUCE cov: 32 ft: 43 corp: 10/211b lim: 135 exec/s: 0 rss: 127Mb L: 132/132 MS: 4 PersAutoDict-ChangeBinInt-EraseBytes-InsertRepeatedBytes- DE: "keylen"-
+#15574	REDUCE cov: 32 ft: 43 corp: 10/208b lim: 149 exec/s: 0 rss: 139Mb L: 129/129 MS: 3 InsertRepeatedBytes-ChangeBinInt-EraseBytes-
+#28125	REDUCE cov: 32 ft: 44 corp: 11/466b lim: 269 exec/s: 0 rss: 220Mb L: 258/258 MS: 1 CopyPart-
+#262144	pulse  cov: 32 ft: 44 corp: 11/466b lim: 2589 exec/s: 87381 rss: 466Mb
+#365725	NEW    cov: 33 ft: 45 corp: 12/1619b lim: 3623 exec/s: 91431 rss: 471Mb L: 1153/1153 MS: 5 CopyPart-InsertByte-CMP-InsertRepeatedBytes-CopyPart- DE: "\000\000aP\000\002\021\353"-
+#365827	REDUCE cov: 33 ft: 45 corp: 12/1561b lim: 3623 exec/s: 91456 rss: 471Mb L: 1095/1095 MS: 2 CMP-EraseBytes- DE: "\001\000\000\000"-
+#366747	NEW    cov: 34 ft: 46 corp: 13/2759b lim: 3623 exec/s: 91686 rss: 471Mb L: 1198/1198 MS: 5 InsertByte-InsertRepeatedBytes-InsertByte-InsertByte-CrossOver-
+#368201	REDUCE cov: 34 ft: 46 corp: 13/2655b lim: 3634 exec/s: 92050 rss: 471Mb L: 1094/1095 MS: 4 EraseBytes-CopyPart-ShuffleBytes-InsertRepeatedBytes-
+#371147	REDUCE cov: 34 ft: 46 corp: 13/2614b lim: 3656 exec/s: 92786 rss: 471Mb L: 1053/1095 MS: 1 EraseBytes-
+#371467	REDUCE cov: 34 ft: 46 corp: 13/2588b lim: 3656 exec/s: 92866 rss: 471Mb L: 1069/1069 MS: 5 InsertRepeatedBytes-ChangeBit-ShuffleBytes-CrossOver-EraseBytes-
+#373535	REDUCE cov: 34 ft: 46 corp: 13/2553b lim: 3667 exec/s: 93383 rss: 472Mb L: 1034/1053 MS: 3 ChangeByte-EraseBytes-CopyPart-
+#380828	REDUCE cov: 34 ft: 46 corp: 13/2530b lim: 3733 exec/s: 76165 rss: 472Mb L: 1030/1034 MS: 3 EraseBytes-ChangeBinInt-InsertByte-
+#418200	REDUCE cov: 34 ft: 46 corp: 13/2527b lim: 4096 exec/s: 83640 rss: 472Mb L: 1031/1031 MS: 2 ShuffleBytes-EraseBytes-
+#429443	REDUCE cov: 34 ft: 46 corp: 13/2522b lim: 4096 exec/s: 85888 rss: 472Mb L: 1026/1030 MS: 3 EraseBytes-ChangeBit-InsertRepeatedBytes-
+#524288	pulse  cov: 34 ft: 46 corp: 13/2522b lim: 4096 exec/s: 87381 rss: 473Mb
+#1048576	pulse  cov: 34 ft: 46 corp: 13/2522b lim: 4096 exec/s: 74898 rss: 483Mb
+==29021== libFuzzer: run interrupted; exiting

@@ -1,0 +1,30 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 553152409
+INFO: Loaded 1 modules   (70 inline 8-bit counters): 70 [0x55ecf2690f80, 0x55ecf2690fc6), 
+INFO: Loaded 1 PC tables (70 PCs): 70 [0x55ecf2690fc8,0x55ecf2691428), 
+INFO:        0 files found in results/analysis/campaign/corpus_sig_ML-DSA-65
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 31Mb
+	NEW_FUNC[1/2]: 0x55ecf19b29d0 in cmf_u8 /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x55ecf19b2bc0 in cmf_randombytes /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:44
+#427	NEW    cov: 20 ft: 21 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 5 CrossOver-ChangeBinInt-InsertRepeatedBytes-InsertByte-InsertByte-
+#428	NEW    cov: 21 ft: 22 corp: 3/17b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 1 CMP- DE: "\003\000\000\000\000\000\000\000"-
+#439	NEW    cov: 24 ft: 28 corp: 4/25b lim: 8 exec/s: 0 rss: 34Mb L: 8/8 MS: 1 ChangeBinInt-
+#746	NEW    cov: 24 ft: 30 corp: 5/34b lim: 11 exec/s: 0 rss: 50Mb L: 9/9 MS: 2 ChangeBinInt-InsertByte-
+#747	NEW    cov: 24 ft: 31 corp: 6/44b lim: 11 exec/s: 0 rss: 51Mb L: 10/10 MS: 1 CopyPart-
+#1053	NEW    cov: 24 ft: 33 corp: 7/57b lim: 14 exec/s: 0 rss: 71Mb L: 13/13 MS: 1 InsertRepeatedBytes-
+#1056	NEW    cov: 24 ft: 34 corp: 8/71b lim: 14 exec/s: 0 rss: 71Mb L: 14/14 MS: 3 EraseBytes-CMP-InsertRepeatedBytes- DE: "\377\377"-
+#1786	NEW    cov: 24 ft: 35 corp: 9/91b lim: 21 exec/s: 0 rss: 127Mb L: 20/20 MS: 5 ChangeByte-EraseBytes-ChangeBinInt-ShuffleBytes-InsertRepeatedBytes-
+#1796	NEW    cov: 24 ft: 36 corp: 10/112b lim: 21 exec/s: 0 rss: 128Mb L: 21/21 MS: 5 ShuffleBytes-InsertRepeatedBytes-ChangeByte-CopyPart-PersAutoDict- DE: "\377\377"-
+#2206	NEW    cov: 24 ft: 37 corp: 11/136b lim: 25 exec/s: 0 rss: 159Mb L: 24/24 MS: 5 CopyPart-ShuffleBytes-CopyPart-CopyPart-InsertRepeatedBytes-
+#2865	REDUCE cov: 24 ft: 37 corp: 11/134b lim: 29 exec/s: 2865 rss: 211Mb L: 22/22 MS: 4 ShuffleBytes-CopyPart-ShuffleBytes-EraseBytes-
+#3796	NEW    cov: 24 ft: 40 corp: 12/172b lim: 38 exec/s: 3796 rss: 284Mb L: 38/38 MS: 1 InsertRepeatedBytes-
+#8192	pulse  cov: 24 ft: 40 corp: 12/172b lim: 80 exec/s: 2730 rss: 382Mb
+#13731	NEW    cov: 24 ft: 43 corp: 13/307b lim: 135 exec/s: 2746 rss: 382Mb L: 135/135 MS: 5 InsertRepeatedBytes-ShuffleBytes-ShuffleBytes-PersAutoDict-CMP- DE: "\003\000\000\000\000\000\000\000"-"\000\000`\300\000\000m\000"-
+#16384	pulse  cov: 24 ft: 43 corp: 13/307b lim: 156 exec/s: 2730 rss: 382Mb
+#27553	NEW    cov: 24 ft: 45 corp: 14/569b lim: 269 exec/s: 2504 rss: 383Mb L: 262/262 MS: 2 InsertRepeatedBytes-CopyPart-
+#27868	REDUCE cov: 24 ft: 48 corp: 15/832b lim: 269 exec/s: 2533 rss: 383Mb L: 263/263 MS: 5 InsertByte-InsertRepeatedBytes-ChangeBit-ChangeBinInt-CopyPart-
+#31251	NEW    cov: 25 ft: 50 corp: 16/1093b lim: 301 exec/s: 2604 rss: 384Mb L: 261/263 MS: 3 InsertByte-EraseBytes-CopyPart-
+#32768	pulse  cov: 25 ft: 50 corp: 16/1093b lim: 309 exec/s: 2520 rss: 384Mb
+==28640== libFuzzer: run interrupted; exiting

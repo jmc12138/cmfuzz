@@ -1,0 +1,18 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1832928791
+INFO: Loaded 1 modules   (70 inline 8-bit counters): 70 [0x5597b38ccf80, 0x5597b38ccfc6), 
+INFO: Loaded 1 PC tables (70 PCs): 70 [0x5597b38ccfc8,0x5597b38cd428), 
+INFO:        0 files found in results/analysis/campaign/corpus_sig_SLH_DSA_PURE_SHA2_128F
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: A corpus is not provided, starting from an empty corpus
+#2	INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 32Mb
+	NEW_FUNC[1/2]: 0x5597b2bee9d0 in cmf_u8 /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:64
+	NEW_FUNC[2/2]: 0x5597b2beebc0 in cmf_randombytes /home/ubuntu/cmfuzz/cmfuzz/harness/../engine/cmfuzz_common.h:44
+#439	NEW    cov: 20 ft: 21 corp: 2/9b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 2 CopyPart-InsertRepeatedBytes-
+#445	NEW    cov: 22 ft: 23 corp: 3/17b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 1 CMP- DE: "\023=\000\000 `\000\000"-
+#446	NEW    cov: 23 ft: 27 corp: 4/25b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 1 ChangeBinInt-
+#448	NEW    cov: 24 ft: 28 corp: 5/33b lim: 8 exec/s: 0 rss: 33Mb L: 8/8 MS: 2 ChangeBit-ShuffleBytes-
+#512	pulse  cov: 24 ft: 28 corp: 5/33b lim: 8 exec/s: 102 rss: 35Mb
+#754	NEW    cov: 24 ft: 30 corp: 6/43b lim: 11 exec/s: 39 rss: 41Mb L: 10/10 MS: 1 CopyPart-
+#775	NEW    cov: 24 ft: 31 corp: 7/52b lim: 11 exec/s: 38 rss: 41Mb L: 9/10 MS: 1 InsertByte-
+==28808== libFuzzer: run interrupted; exiting
