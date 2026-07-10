@@ -26,8 +26,9 @@ for k in "${KEMS[@]}"; do run_one 0 "$k" decaps; done
 for s in "${SIGS[@]}"; do run_one 1 "$s" sign; done
 
 # Traditional-algorithm constant-time targets (orthogonal to PQC): AES-NI block
-# encrypt, constant-time vs naive tag compare.
-for op in 0 1 2; do
+# encrypt, constant-time vs naive tag compare, AES-CBC PKCS#7 padding oracle,
+# and HMAC-SHA256 message-content constant-timeness.
+for op in 0 1 2 3 4; do
   bin="$OUT/ct_trad_$op"
   clang -O2 -Wno-deprecated-declarations -DCMF_TRAD_OP=$op "$ROOT/engine/ct_dudect_trad.c" -lcrypto -lm -o "$bin"
   echo "[ct] running traditional op=$op ..."

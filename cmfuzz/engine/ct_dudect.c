@@ -55,6 +55,25 @@ static int cmp_u64(const void *x, const void *y) {
     return (a > b) - (a < b);
 }
 
+/* Whether this algorithm/op is EXPECTED to be constant-time.
+ *  - KEM decapsulation processes the secret key and MUST be constant-time
+ *    (a timing leak here is a genuine FINDING, e.g. an implicit-reject bug).
+ *  - Lattice signature signing is variable-time BY DESIGN: ML-DSA/Dilithium use
+ *    rejection sampling and Falcon uses floating-point Gaussian sampling, so
+ *    their signing time depends on secret-derived values; a timing signal is
+ *    EXPECTED_VARTIME, not a bug. Hash-based SLH-DSA/SPHINCS+ signing is
+ *    constant-time and so is still expected to be CT. */
+static int expect_constant_time(void) {
+#if CMF_KIND == 0
+    return 1;
+#else
+    const char *a = CMF_ALG;
+    if (strstr(a, "ML-DSA") || strstr(a, "Dilithium") || strstr(a, "Falcon"))
+        return 0;
+    return 1;
+#endif
+}
+
 int main(void) {
     OQS_init();
     uint8_t *cls = malloc(N_MEAS);            /* class label per measurement */
@@ -131,9 +150,13 @@ int main(void) {
         if (fabs(t) > max_abs_t) { max_abs_t = fabs(t); best_cut = cut; }
     }
 
-    const char *verdict = max_abs_t > T_THRESHOLD ? "LEAK" : "OK";
-    printf("CMF_CT alg=%s op=%s meas=%d max_t=%.2f cut=%llu verdict=%s\n",
+    int leaked = max_abs_t > T_THRESHOLD;
+    int ect = expect_constant_time();
+    const char *expect = ect ? "ct" : "vartime";
+    const char *verdict = ect ? (leaked ? "FINDING" : "OK")
+                              : (leaked ? "EXPECTED_VARTIME" : "OK_UNEXPECTEDLY_CT");
+    printf("CMF_CT alg=%s op=%s meas=%d max_t=%.2f cut=%llu expect=%s verdict=%s\n",
            CMF_ALG, (CMF_KIND == 0 ? "decaps" : "sign"),
-           N_MEAS, max_abs_t, (unsigned long long)best_cut, verdict);
+           N_MEAS, max_abs_t, (unsigned long long)best_cut, expect, verdict);
     return 0;
 }
