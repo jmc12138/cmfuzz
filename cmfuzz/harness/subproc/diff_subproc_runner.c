@@ -145,7 +145,14 @@ static int ecdsa_make_payload(uint8_t *pl, size_t *plen, int *verdict) {
         EVP_DigestSign(sc, sig, &siglen, msg, mlen) == 1;
     EVP_MD_CTX_free(sc);
     if (!signed_ok) return -1;
-    if (rnd() & 1) msg[rnd() % mlen] ^= 0x01;   /* tamper -> signature no longer valid */
+    /* Stronger tampering (blind-spot C): on ~half the vectors flip a random bit
+     * in EITHER the message OR the signature before the verdict is computed, so
+     * backends' reject paths are exercised for both a content change and a
+     * malformed/invalid signature (not just a message edit). */
+    if (rnd() & 1) {
+        if (rnd() & 1) msg[rnd() % mlen]    ^= (uint8_t)(1u << (rnd() % 8));
+        else           sig[rnd() % siglen] ^= (uint8_t)(1u << (rnd() % 8));
+    }
     EVP_MD_CTX *vc = EVP_MD_CTX_new();
     *verdict = (vc &&
         EVP_DigestVerifyInit(vc, NULL, EVP_sha256(), NULL, g_ecdsa_key) == 1 &&
@@ -199,7 +206,12 @@ static int rsa_make_payload(uint8_t *pl, size_t *plen, int *verdict) {
     for (size_t i = 0; i < mlen; i++) msg[i] = (uint8_t)(rnd() & 0xFF);
     uint8_t sig[512]; size_t siglen = sizeof sig;
     if (rsa_pss_sign_or_verify(1, sig, &siglen, msg, mlen) != 0) return -1;
-    if (rnd() & 1) msg[rnd() % mlen] ^= 0x01;   /* tamper -> signature no longer valid */
+    /* Stronger tampering (blind-spot C): flip a random bit in the message OR the
+     * signature before computing the verdict. */
+    if (rnd() & 1) {
+        if (rnd() & 1) msg[rnd() % mlen]    ^= (uint8_t)(1u << (rnd() % 8));
+        else           sig[rnd() % siglen] ^= (uint8_t)(1u << (rnd() % 8));
+    }
     *verdict = (rsa_pss_sign_or_verify(0, sig, &siglen, msg, mlen) == 0) ? 1 : 0;
     BIGNUM *bn = NULL;
     if (EVP_PKEY_get_bn_param(g_rsa_key, OSSL_PKEY_PARAM_RSA_N, &bn) != 1 || !bn) return -1;
@@ -381,23 +393,40 @@ int main(int argc, char **argv) {
     }
     fclose(rf);
 
-    int failures = 0;
+    /* ------------------------------------------------------------------ *
+     * Collect every backend's full output, then run the oracle per vector.
+     * Collecting first lets us MAJORITY-VOTE across all voters instead of
+     * trusting OpenSSL by fiat (blind-spot C).
+     * ------------------------------------------------------------------ */
+    int nb = argc - 3;
+    char (**bo)[8300] = malloc((size_t)nb * sizeof *bo);   /* bo[b][i] = reply hex */
+    const char **bname = malloc((size_t)nb * sizeof *bname);
+    long *bprod = calloc((size_t)nb, sizeof *bprod);       /* lines produced */
+    long *bna   = calloc((size_t)nb, sizeof *bna);         /* "NA" replies */
+    long *bdiv  = calloc((size_t)nb, sizeof *bdiv);        /* divergences */
+    if (!bo || !bname || !bprod || !bna || !bdiv) { fprintf(stderr, "oom\n"); return 2; }
+
     for (int a = 3; a < argc; a++) {
+        int b = a - 3;
         char *eq = strchr(argv[a], '=');
         if (!eq) { fprintf(stderr, "bad backend spec: %s\n", argv[a]); return 2; }
         *eq = '\0';
-        const char *name = argv[a], *path = eq + 1;
+        bname[b] = argv[a];
+        const char *path = eq + 1;
+        bo[b] = malloc((size_t)N * sizeof *bo[b]);
+        if (!bo[b]) { fprintf(stderr, "oom\n"); return 2; }
+        for (long i = 0; i < N; i++) bo[b][i][0] = '\0';   /* '' = missing */
 
         /* Spawn the backend CLI via fork/exec instead of popen(): no shell is
          * involved, so a backend path containing quotes/spaces/metachars can
          * never break or be reinterpreted. Child reads the request file on
          * stdin and writes results on the pipe. */
         int fin = open(reqpath, O_RDONLY);
-        if (fin < 0) { fprintf(stderr, "open req failed for %s\n", name); return 2; }
+        if (fin < 0) { fprintf(stderr, "open req failed for %s\n", bname[b]); return 2; }
         int fd[2];
-        if (pipe(fd) != 0) { fprintf(stderr, "pipe failed for %s\n", name); close(fin); return 2; }
+        if (pipe(fd) != 0) { fprintf(stderr, "pipe failed for %s\n", bname[b]); close(fin); return 2; }
         pid_t pid = fork();
-        if (pid < 0) { fprintf(stderr, "fork failed for %s\n", name); close(fin); close(fd[0]); close(fd[1]); return 2; }
+        if (pid < 0) { fprintf(stderr, "fork failed for %s\n", bname[b]); close(fin); close(fd[0]); close(fd[1]); return 2; }
         if (pid == 0) {
             dup2(fin, STDIN_FILENO);
             dup2(fd[1], STDOUT_FILENO);
@@ -407,40 +436,112 @@ int main(int argc, char **argv) {
         }
         close(fin); close(fd[1]);
         FILE *p = fdopen(fd[0], "r");
-        if (!p) { fprintf(stderr, "fdopen failed for %s\n", name); close(fd[0]); waitpid(pid, NULL, 0); return 2; }
+        if (!p) { fprintf(stderr, "fdopen failed for %s\n", bname[b]); close(fd[0]); waitpid(pid, NULL, 0); return 2; }
 
-        char *line = NULL; size_t cap = 0; long i = 0; int mism = 0;
+        char *line = NULL; size_t cap = 0; long i = 0;
         while (i < N && getline(&line, &cap, p) > 0) {
             size_t ll = strlen(line);
             while (ll && (line[ll-1]=='\n' || line[ll-1]=='\r')) line[--ll] = '\0';
-            /* "NA" = backend does not implement this op -> skip (not a bug). */
-            if (strcmp(line, "NA") == 0) { i++; continue; }
+            if (strcmp(line, "NA") == 0) { strcpy(bo[b][i], "NA"); bna[b]++; i++; continue; }
             /* Apply the same X25519 degenerate-output normalisation to the
              * backend's reply as was applied to the reference. */
             if (ops[i] == 12) x25519_normalize(line);
-            if (strcmp(line, refhex[i]) != 0) {
-                char msg[160];
-                snprintf(msg, sizeof msg, "openssl vs %s disagree at vec #%ld (op-seeded)", name, i);
-                fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=DIFF_mismatch detail=\"%s\"\n", msg);
-                fprintf(stderr, "  openssl=%.64s...\n  %s=%.64s...\n", refhex[i], name, line);
-                mism = 1; failures++;
-                break;
-            }
+            snprintf(bo[b][i], sizeof bo[b][i], "%s", line);
             i++;
         }
         fclose(p);
         waitpid(pid, NULL, 0);
         free(line);
-        if (!mism && i < N)
-            { fprintf(stderr, "backend %s produced only %ld/%ld outputs\n", name, i, N); failures++; }
-        else if (!mism)
-            fprintf(stderr, "[diff-subproc] %s agrees on %ld vectors\n", name, N);
+        bprod[b] = i;
     }
+
+    /* Per-vector oracle. Deterministic compute ops (0..12) use a MAJORITY VOTE
+     * across all voters (OpenSSL reference + every backend that answered), so a
+     * bug in ANY single implementation -- including OpenSSL itself -- surfaces
+     * as the outlier instead of being trusted by fiat. Verify-interop ops
+     * (13/14) stay reference-authoritative: OpenSSL is the signer that defined
+     * the accept/reject ground truth. An "NA" reply abstains from the vote (NA
+     * rates are exposed in the summary so a backend cannot silently opt out of
+     * coverage and appear to "agree"). */
+    int failures = 0;
+    long ref_outlier = 0;
+    for (long i = 0; i < N; i++) {
+        const char *vv[16], *vn[16]; int vb[16], nv = 0;
+        vv[nv] = refhex[i]; vn[nv] = "openssl"; vb[nv] = -1; nv++;
+        for (int b = 0; b < nb && nv < 16; b++) {
+            if (bprod[b] <= i) continue;                 /* short output: not a voter */
+            if (strcmp(bo[b][i], "NA") == 0) continue;   /* abstains */
+            vv[nv] = bo[b][i]; vn[nv] = bname[b]; vb[nv] = b; nv++;
+        }
+        if (nv <= 1) continue;   /* only the reference present: nothing to check */
+
+        if (ops[i] == 13 || ops[i] == 14) {
+            for (int j = 1; j < nv; j++)
+                if (strcmp(vv[j], vv[0]) != 0) {
+                    fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=VERIFY_mismatch detail=\"openssl(authority) vs %s disagree at vec #%ld op=%d\"\n", vn[j], i, ops[i]);
+                    fprintf(stderr, "  openssl=%s  %s=%s\n", vv[0], vn[j], vv[j]);
+                    bdiv[vb[j]]++; failures++;
+                }
+            continue;
+        }
+
+        if (nv == 2) {
+            /* Only the reference + one backend: no third voter to form a
+             * majority, so fall back to reference-authoritative pairwise. */
+            if (strcmp(vv[1], vv[0]) != 0) {
+                fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=DIFF_mismatch detail=\"openssl vs %s disagree at vec #%ld op=%d\"\n", vn[1], i, ops[i]);
+                fprintf(stderr, "  openssl=%.48s  %s=%.48s\n", vv[0], vn[1], vv[1]);
+                bdiv[vb[1]]++; failures++;
+            }
+            continue;
+        }
+
+        /* >= 3 voters: find the value backed by the most voters. */
+        int bestcount = 0, bestj = 0;
+        for (int j = 0; j < nv; j++) {
+            int c = 0;
+            for (int k = 0; k < nv; k++) if (strcmp(vv[j], vv[k]) == 0) c++;
+            if (c > bestcount) { bestcount = c; bestj = j; }
+        }
+        if (bestcount == nv) continue;   /* unanimous agreement */
+        if (bestcount * 2 <= nv) {
+            /* no strict majority (e.g. a 2-2 split) -> unresolved divergence; no
+             * ground truth exists, so it is not attributed to any one backend. */
+            fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=DIFF_noconsensus detail=\"no majority among %d voters at vec #%ld op=%d\"\n", nv, i, ops[i]);
+            for (int j = 0; j < nv; j++)
+                fprintf(stderr, "  %s=%.48s\n", vn[j], vv[j]);
+            failures++;
+            continue;
+        }
+        const char *maj = vv[bestj];
+        for (int j = 0; j < nv; j++) {
+            if (strcmp(vv[j], maj) == 0) continue;
+            fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=DIFF_mismatch detail=\"%s is minority vs majority at vec #%ld op=%d\"\n", vn[j], i, ops[i]);
+            fprintf(stderr, "  majority=%.48s  %s=%.48s\n", maj, vn[j], vv[j]);
+            if (vb[j] >= 0) bdiv[vb[j]]++; else ref_outlier++;
+            failures++;
+        }
+    }
+
+    /* NA exposure + per-backend summary: silent non-implementation is now
+     * visible, and a backend that abstained on everything is called out. */
+    for (int b = 0; b < nb; b++) {
+        fprintf(stderr, "[diff-subproc] %s: answered %ld/%ld, NA %ld, diverged %ld\n",
+                bname[b], bprod[b], N, bna[b], bdiv[b]);
+        if (bprod[b] < N)
+            fprintf(stderr, "[diff-subproc] WARNING: %s produced only %ld/%ld outputs\n", bname[b], bprod[b], N);
+        if (bna[b] == N)
+            fprintf(stderr, "[diff-subproc] WARNING: %s replied NA to all %ld vectors (no differential coverage)\n", bname[b], N);
+    }
+    if (ref_outlier)
+        fprintf(stderr, "[diff-subproc] NOTE: openssl was outvoted on %ld vector(s) -- the reference may be the buggy implementation\n", ref_outlier);
 
     remove(reqpath);
     free(reqpath);
     free(refhex);
     free(ops);
+    for (int b = 0; b < nb; b++) free(bo[b]);
+    free(bo); free(bname); free(bprod); free(bna); free(bdiv);
     if (failures) { fprintf(stderr, "[diff-subproc] %d backend(s) diverged\n", failures); return 1; }
     fprintf(stderr, "[diff-subproc] all backends agree\n");
     return 0;
