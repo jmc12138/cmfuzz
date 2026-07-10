@@ -242,6 +242,56 @@ static void tohex(const uint8_t *b, size_t n, char *out) {
     out[2*n] = '\0';
 }
 
+/* Adversarial X25519 peer u-coordinates (blind-spot B): the classic low-order
+ * points (orders 1/2/4/8) and the field-boundary values p-1, p, p+1. Each drives
+ * the scalar multiplication into its degenerate case, which random fuzzing
+ * effectively never reaches. RFC 7748 lets an implementation EITHER return the
+ * resulting all-zero shared secret OR raise an error, so these are not by
+ * themselves divergences: x25519_normalize() folds "all-zero secret" and "ERR"
+ * to one verdict before comparison (little-endian, per RFC 7748). */
+static const uint8_t X25519_EDGE[][CMF_X25519_LEN] = {
+    /* u = 0 (order 1) */
+    {0x00},
+    /* u = 1 (order 1) */
+    {0x01},
+    /* order-8 point */
+    {0xe0,0xeb,0x7a,0x7c,0x3b,0x41,0xb8,0xae,0x16,0x56,0xe3,0xfa,0xf1,0x9f,0xc4,0x6a,
+     0xda,0x09,0x8d,0xeb,0x9c,0x32,0xb1,0xfd,0x86,0x62,0x05,0x16,0x5f,0x49,0xb8,0x00},
+    /* order-8 point */
+    {0x5f,0x9c,0x95,0xbc,0xa3,0x50,0x8c,0x24,0xb1,0xd0,0xb1,0x55,0x9c,0x83,0xef,0x5b,
+     0x04,0x44,0x5c,0xc4,0x58,0x1c,0x8e,0x86,0xd8,0x22,0x4e,0xdd,0xd0,0x9f,0x11,0x57},
+    /* p-1 */
+    {0xec,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+     0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7f},
+    /* p */
+    {0xed,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+     0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7f},
+    /* p+1 */
+    {0xee,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+     0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7f},
+    /* all-ones (non-canonical; the top bit is masked to canonical form) */
+    {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+     0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff},
+};
+#define X25519_EDGE_N (sizeof X25519_EDGE / sizeof X25519_EDGE[0])
+
+/* Boundary message lengths (blind-spot B): block/limb edges that block ciphers,
+ * hashes and KDFs mis-handle far more often than random lengths do. */
+static const size_t BOUNDARY_LEN[] = {
+    0, 1, 15, 16, 17, 31, 32, 33, 55, 56, 63, 64, 65, 127, 128, 129, 255, 256
+};
+#define BOUNDARY_LEN_N (sizeof BOUNDARY_LEN / sizeof BOUNDARY_LEN[0])
+
+/* Fold X25519's spec-permitted degenerate outputs to a single verdict: an
+ * all-zero 32-byte shared secret becomes "ERR" (which is also what a library
+ * that rejects low-order points emits), so a permitted error-vs-zero difference
+ * is not reported as a divergence. Mutates hex in place. */
+static void x25519_normalize(char *hex) {
+    if (strlen(hex) != 2 * CMF_X25519_LEN) return;
+    for (size_t j = 0; hex[j]; j++) if (hex[j] != '0') return;
+    strcpy(hex, "ERR");
+}
+
 int main(int argc, char **argv) {
     if (argc < 4) {
         fprintf(stderr, "usage: %s <n> <seed> <name=path> [<name=path>...]\n", argv[0]);
@@ -257,10 +307,12 @@ int main(int argc, char **argv) {
     FILE *rf = fdopen(rfd, "w");
 
     char (*refhex)[8300] = malloc((size_t)N * sizeof *refhex);
-    if (!refhex) { fprintf(stderr, "oom\n"); return 2; }
+    int *ops = malloc((size_t)N * sizeof *ops);
+    if (!refhex || !ops) { fprintf(stderr, "oom\n"); return 2; }
 
     for (long i = 0; i < N; i++) {
         int op = (int)(rnd() % CMF_NUM_OPS);
+        ops[i] = op;
 
         /* Verify-interop ops carry a packed (pub||sig||msg) payload in the msg
          * region and compare only the 1-byte accept/reject verdict. */
@@ -286,6 +338,9 @@ int main(int argc, char **argv) {
         }
 
         size_t msglen = rnd() % 512;
+        /* Boundary-length adversarial inputs (blind-spot B): occasionally pin the
+         * message to a block/limb edge instead of a random length. */
+        if (op != 12 && (rnd() % 4) == 0) msglen = BOUNDARY_LEN[rnd() % BOUNDARY_LEN_N];
         if (op == 12) msglen = CMF_X25519_LEN;   /* X25519 peer public key */
         size_t aadlen = (op == 3 || op == 4 || op == 9) ? (rnd() % 64) : 0;
         size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + aadlen + msglen;
@@ -294,6 +349,12 @@ int main(int argc, char **argv) {
         blob[CMF_KEYLEN + CMF_NONCELEN]     = (uint8_t)(aadlen >> 8);
         blob[CMF_KEYLEN + CMF_NONCELEN + 1] = (uint8_t)(aadlen & 0xFF);
         rnd_bytes(blob + CMF_KEYLEN + CMF_NONCELEN + 2, aadlen + msglen);
+        /* X25519 adversarial peer keys (blind-spot B): on ~1/3 of vectors replace
+         * the random peer u-coordinate with a known low-order / boundary point so
+         * the degenerate scalar-mult paths are actually exercised. */
+        if (op == 12 && (rnd() % 3) == 0)
+            memcpy(blob + CMF_KEYLEN + CMF_NONCELEN + 2,
+                   X25519_EDGE[rnd() % X25519_EDGE_N], CMF_X25519_LEN);
         /* X25519: clear bit 255 of the peer u-coordinate so it is in RFC 7748
          * canonical form. OpenSSL/BoringSSL/Botan mask this bit internally, but
          * wolfCrypt rejects a non-canonical peer key outright; masking here keeps
@@ -315,6 +376,7 @@ int main(int argc, char **argv) {
         uint8_t o[8192]; size_t on = 0;
         if (ref_compute(&v, o, &on) != 0) { strcpy(refhex[i], "ERR"); }
         else tohex(o, on, refhex[i]);
+        if (op == 12) x25519_normalize(refhex[i]);   /* fold all-zero secret -> ERR */
         free(blob);
     }
     fclose(rf);
@@ -353,6 +415,9 @@ int main(int argc, char **argv) {
             while (ll && (line[ll-1]=='\n' || line[ll-1]=='\r')) line[--ll] = '\0';
             /* "NA" = backend does not implement this op -> skip (not a bug). */
             if (strcmp(line, "NA") == 0) { i++; continue; }
+            /* Apply the same X25519 degenerate-output normalisation to the
+             * backend's reply as was applied to the reference. */
+            if (ops[i] == 12) x25519_normalize(line);
             if (strcmp(line, refhex[i]) != 0) {
                 char msg[160];
                 snprintf(msg, sizeof msg, "openssl vs %s disagree at vec #%ld (op-seeded)", name, i);
@@ -375,6 +440,7 @@ int main(int argc, char **argv) {
     remove(reqpath);
     free(reqpath);
     free(refhex);
+    free(ops);
     if (failures) { fprintf(stderr, "[diff-subproc] %d backend(s) diverged\n", failures); return 1; }
     fprintf(stderr, "[diff-subproc] all backends agree\n");
     return 0;
