@@ -5,11 +5,20 @@
  * primitive. Demonstrates that constant-time testing is orthogonal to the
  * algorithm family and applies to classic crypto too.
  *
+ * Each op declares whether it is EXPECTED to be constant-time; the verdict is
+ * then classified against that expectation so a deliberately variable-time
+ * demonstrator does not read as a bug:
+ *   measured constant + expect ct       -> OK
+ *   measured leak     + expect ct        -> FINDING          (real problem)
+ *   measured leak     + expect vartime   -> EXPECTED_VARTIME  (by design)
+ *   measured constant + expect vartime   -> OK_UNEXPECTEDLY_CT
+ *
  * -DCMF_TRAD_OP:
- *   0 = AES-256 block encrypt (AES-NI)        -> expect OK (constant-time)
- *   1 = CRYPTO_memcmp tag compare             -> expect OK (constant-time)
- *   2 = naive byte-by-byte tag compare (early-exit, variable-time)
- *                                             -> expect LEAK (demonstrates detection)
+ *   0 = AES-256 block encrypt (AES-NI)        expect ct       -> OK
+ *   1 = CRYPTO_memcmp tag compare             expect ct       -> OK
+ *   2 = naive byte-by-byte tag compare        expect vartime  -> EXPECTED_VARTIME
+ *   3 = AES-CBC PKCS#7 naive unpad (Lucky13)  expect vartime  -> EXPECTED_VARTIME
+ *   4 = HMAC-SHA256 over message content      expect ct       -> OK
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -18,6 +27,7 @@
 #include <math.h>
 #include <openssl/evp.h>
 #include <openssl/aes.h>
+#include <openssl/hmac.h>
 #include <openssl/crypto.h>
 
 #ifndef CMF_TRAD_OP
@@ -54,6 +64,27 @@ static int naive_memcmp(const uint8_t *a, const uint8_t *b, size_t n) {
     return 0;
 }
 
+/* naive PKCS#7 unpad validation: reads pad length from the last byte then
+ * verifies each padding byte, EARLY-EXITING on the first bad byte. This is the
+ * classic Lucky13/padding-oracle shape: validation time depends on where the
+ * padding first diverges, so it is expected to be variable-time. */
+static volatile uint64_t g_sink;
+static int naive_pkcs7_ok(const uint8_t *blk) {
+    unsigned pad = blk[15];
+    if (pad < 1 || pad > 16) return 0;
+    uint64_t acc = 0;
+    for (unsigned i = 0; i < pad; i++) {
+        /* per-byte processing cost (models the MAC-over-plaintext work whose
+         * total scales with how many bytes are examined) so the early-exit
+         * difference is above the timer's noise floor. */
+        for (int k = 0; k < 48; k++)
+            acc = acc * 6364136223846793005ULL + 1442695040888963407ULL + blk[15 - i];
+        if (blk[15 - i] != (uint8_t)pad) { g_sink = acc; return 0; }  /* early exit */
+    }
+    g_sink = acc;
+    return 1;
+}
+
 int main(void) {
     uint8_t *cls = malloc(N_MEAS);
     uint64_t *cyc = malloc(sizeof(uint64_t) * N_MEAS);
@@ -72,14 +103,29 @@ int main(void) {
     uint8_t *pool = malloc(16 * BLK_POOL);
     for (int i = 0; i < BLK_POOL * 16; i++) pool[i] = (uint8_t)rand();
 
-    /* fixed reference tag (class 0 matches it fully; class 1 differs early) */
-    uint8_t tag_ref[16]; memset(tag_ref, 0xA5, 16);
-    uint8_t tag_fixed[16]; memcpy(tag_fixed, tag_ref, 16);   /* equal */
-    uint8_t tag_rand[16];
+    /* fixed reference tag/buffer (class 0 matches it fully; class 1 differs early).
+     * 256 bytes so an early-exit naive compare has a measurable scan-length delta
+     * vs a full constant-time compare (a 16-byte delta is below the timer noise). */
+#define CMPLEN 256
+    uint8_t tag_ref[CMPLEN]; memset(tag_ref, 0xA5, CMPLEN);
+    uint8_t tag_rand[CMPLEN];
 
     const char *opname = (CMF_TRAD_OP == 0) ? "aes256_enc"
                         : (CMF_TRAD_OP == 1) ? "crypto_memcmp"
-                                             : "naive_memcmp";
+                        : (CMF_TRAD_OP == 2) ? "naive_memcmp"
+                        : (CMF_TRAD_OP == 3) ? "aescbc_pkcs7_oracle"
+                                             : "hmac_sha256_msg";
+#if CMF_TRAD_OP == 2 || CMF_TRAD_OP == 3
+    const char *expect = "vartime";
+#else
+    const char *expect = "ct";
+#endif
+
+    /* HMAC (op4): a random message pool + fixed reference message, both 64B. */
+    uint8_t msg_fixed[64]; memset(msg_fixed, 0x33, sizeof msg_fixed);
+    uint8_t hkey[32]; for (int i = 0; i < 32; i++) hkey[i] = (uint8_t)rand();
+    unsigned char mac[EVP_MAX_MD_SIZE]; unsigned int maclen = 0;
+    (void)msg_fixed; (void)hkey; (void)mac; (void)maclen;
 
     for (size_t i = 0; i < N_MEAS; i++) {
         cls[i] = rand() & 1;
@@ -88,29 +134,54 @@ int main(void) {
          * block, class 1 from the random pool. Only the AES input data differs. */
         uint8_t blk[16];
         size_t idx = (size_t)(rand() % BLK_POOL);   /* both classes call rand() */
-        const uint8_t *src = cls[i] ? (pool + idx * 16) : in;
+        /* both classes read from the pool (identical access pattern); class 0
+         * always block 0 (fixed value), class 1 a random block. */
+        const uint8_t *src = cls[i] ? (pool + idx * 16) : pool;
         memcpy(blk, src, 16);
         uint64_t t0 = rdtsc();
         AES_encrypt(blk, out, &ak);
         uint64_t t1 = rdtsc();
-#else
+#elif CMF_TRAD_OP == 1 || CMF_TRAD_OP == 2
         /* class 0: tag equals ref (compare must scan all 16 bytes);
-         * class 1: differs in a random early position (leaky compare exits early) */
-        const uint8_t *cand;
-        if (cls[i]) {
-            memcpy(tag_rand, tag_ref, 16);
-            tag_rand[rand() % 16] ^= 0xFF;
-            cand = tag_rand;
-        } else cand = tag_fixed;
+         * class 1: differs in a random early position (leaky compare exits early).
+         * Symmetric prologue: BOTH classes memcpy the candidate and call rand()%16;
+         * only class 1 actually flips the byte (avoids a per-class work artifact). */
+        memcpy(tag_rand, tag_ref, CMPLEN);
+        unsigned fpos = (unsigned)(rand() % 8);   /* early byte (both classes call rand) */
+        if (cls[i]) tag_rand[fpos] ^= 0xFF;       /* class 1 diverges in first 8 bytes */
+        const uint8_t *cand = tag_rand;
         volatile int rc;
         uint64_t t0 = rdtsc();
     #if CMF_TRAD_OP == 1
-        rc = CRYPTO_memcmp(cand, tag_ref, 16);
+        rc = CRYPTO_memcmp(cand, tag_ref, CMPLEN);
     #else
-        rc = naive_memcmp(cand, tag_ref, 16);
+        rc = naive_memcmp(cand, tag_ref, CMPLEN);
     #endif
         uint64_t t1 = rdtsc();
         (void)rc;
+#elif CMF_TRAD_OP == 3
+        /* AES-CBC PKCS#7 padding oracle. Both classes build a valid pad=16 block
+         * (identical memset prologue); class 1 corrupts an early-checked byte so
+         * the naive unpad early-exits, making validation time leak the padding. */
+        uint8_t blk[16]; memset(blk, 0x10, 16);
+        (void)(rand() % BLK_POOL);                  /* symmetric rand() call */
+        if (cls[i]) blk[14] = 0x00;                 /* diverges at 2nd byte checked */
+        volatile int rc;
+        uint64_t t0 = rdtsc();
+        rc = naive_pkcs7_ok(blk);
+        uint64_t t1 = rdtsc();
+        (void)rc;
+#else /* CMF_TRAD_OP == 4 : HMAC-SHA256 over the message content */
+        /* HMAC is constant-time w.r.t. message *content*; both classes memcpy a
+         * 64B message (identical prologue) — class 0 fixed, class 1 random — then
+         * time the full HMAC. Expect OK (no content-dependent timing). */
+        uint8_t msgbuf[64];
+        size_t idx = (size_t)(rand() % (BLK_POOL - 4));
+        const uint8_t *src = cls[i] ? (pool + idx * 16) : msg_fixed;
+        memcpy(msgbuf, src, 64);
+        uint64_t t0 = rdtsc();
+        HMAC(EVP_sha256(), hkey, 32, msgbuf, 64, mac, &maclen);
+        uint64_t t1 = rdtsc();
 #endif
         cyc[i] = t1 - t0;
     }
@@ -131,8 +202,11 @@ int main(void) {
         double t = welch_t(&a, &b);
         if (fabs(t) > max_abs_t) { max_abs_t = fabs(t); best_cut = cut; }
     }
-    const char *verdict = max_abs_t > T_THRESHOLD ? "LEAK" : "OK";
-    printf("CMF_CT alg=traditional op=%s meas=%d max_t=%.2f cut=%llu verdict=%s\n",
-           opname, N_MEAS, max_abs_t, (unsigned long long)best_cut, verdict);
+    int leaked = max_abs_t > T_THRESHOLD;
+    const char *verdict;
+    if (strcmp(expect, "ct") == 0) verdict = leaked ? "FINDING" : "OK";
+    else                          verdict = leaked ? "EXPECTED_VARTIME" : "OK_UNEXPECTEDLY_CT";
+    printf("CMF_CT alg=traditional op=%s meas=%d max_t=%.2f cut=%llu expect=%s verdict=%s\n",
+           opname, N_MEAS, max_abs_t, (unsigned long long)best_cut, expect, verdict);
     return 0;
 }
