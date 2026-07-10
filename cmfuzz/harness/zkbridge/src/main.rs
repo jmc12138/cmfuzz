@@ -7,9 +7,11 @@
 // public input), run Groth16 setup/prove/verify, and check the metamorphic
 // relations a correct SNARK verifier must satisfy:
 //
-//   completeness : verify(vk, [c],    honest_proof)      == accept
-//   soundness-1  : verify(vk, [c+1],  honest_proof)      == reject  (wrong public input)
-//   soundness-2  : verify(vk, [c],    other_proof)       == reject  (proof for another stmt)
+//   completeness : verify(vk,  [c],   honest_proof)      == accept
+//   soundness-1  : verify(vk,  [c+1], honest_proof)      == reject  (wrong public input)
+//   soundness-2  : verify(vk,  [c],   other_proof)       == reject  (proof for another stmt)
+//   soundness-3  : verify(vk,  [c],   tampered_proof)    == reject  (malformed proof)
+//   soundness-4  : verify(vk2, [c],   honest_proof)      == reject  (proof bound to its CRS)
 //
 // Any violated relation prints CMF_VIOLATION ... oracle=O_zk_groth16_verify and
 // exits non-zero. Under `--features fault` the completeness result is inverted to
@@ -64,6 +66,13 @@ fn main() {
         Groth16::<Bn254>::circuit_specific_setup(setup_circuit, &mut rng).expect("setup");
     let pvk = Groth16::<Bn254>::process_vk(&vk).expect("process_vk");
 
+    // A second, independent CRS for the same circuit: an honest proof must be
+    // bound to the CRS it was produced under and MUST be rejected by this one.
+    let setup_circuit2 = MulCircuit { a: None, b: None, c: None };
+    let (_pk2, vk2) =
+        Groth16::<Bn254>::circuit_specific_setup(setup_circuit2, &mut rng).expect("setup2");
+    let pvk2 = Groth16::<Bn254>::process_vk(&vk2).expect("process_vk2");
+
     let mut failures = 0u64;
     for _ in 0..iters {
         let a = Fr::rand(&mut rng);
@@ -97,6 +106,16 @@ fn main() {
         let sound_wrong_stmt =
             Groth16::<Bn254>::verify_with_processed_vk(&pvk, &[c], &proof2).expect("verify");
 
+        // Malformed proof: corrupt the C group element; the verifier must reject.
+        let mut tampered = proof.clone();
+        tampered.c = proof.a;
+        let sound_tampered =
+            Groth16::<Bn254>::verify_with_processed_vk(&pvk, &[c], &tampered).expect("verify");
+
+        // Wrong CRS: the honest proof must not verify under an independent setup.
+        let sound_wrong_crs =
+            Groth16::<Bn254>::verify_with_processed_vk(&pvk2, &[c], &proof).expect("verify");
+
         #[cfg(feature = "fault")]
         {
             completeness = !completeness; // emulate a broken verifier
@@ -112,6 +131,14 @@ fn main() {
         }
         if sound_wrong_stmt {
             violation("soundness: proof for a different statement accepted");
+            failures += 1;
+        }
+        if sound_tampered {
+            violation("soundness: tampered proof accepted");
+            failures += 1;
+        }
+        if sound_wrong_crs {
+            violation("soundness: proof accepted under an independent CRS");
             failures += 1;
         }
     }
