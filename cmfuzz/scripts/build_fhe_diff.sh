@@ -35,3 +35,12 @@ $CXX -std=c++17 -O2 $DEF $SEAL_INC \
     "$ROOT/harness/fhe_ckks_harness.cpp" \
     "${SEAL_LIB[@]}" -lpthread -o "$OUT/fhe_ckks$SFX"
 echo "[build] fhe_ckks -> $OUT/fhe_ckks$SFX"
+
+# CKKS cross-library differential (OpenFHE vs SEAL), the O1 companion to fhe_ckks.
+# OpenFHE's CKKS-RNS objects reference its binfhe scheme-switching symbols, so
+# libOPENFHEbinfhe_static.a must also be on the link line.
+OFHE_BINFHE="$OFHE/build/lib/libOPENFHEbinfhe_static.a"
+$CXX -std=c++17 -O2 -fopenmp $DEF $SEAL_INC $OFHE_INC \
+    "$ROOT/harness/fhe_ckks_diff_harness.cpp" \
+    $OFHE_LIB "$OFHE_BINFHE" "${SEAL_LIB[@]}" -lpthread -o "$OUT/fhe_ckks_diff$SFX"
+echo "[build] fhe_ckks_diff -> $OUT/fhe_ckks_diff$SFX"
