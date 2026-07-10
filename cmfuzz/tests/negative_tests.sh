@@ -211,6 +211,24 @@ else
   echo "SKIP  PQC differential self-test (PQClean not built; run scripts/build_pqclean.sh)"
 fi
 
+# Stage 2.3 PQC deterministic NIST-KAT byte-exact cross-check self-test (liboqs
+# vs PQClean under a shared AES-256-CTR-DRBG; only if the PQClean archive built).
+if [ -f "$PQC_A" ]; then
+  echo "[neg] building fault-injected PQC KAT cross-check (liboqs vs PQClean)..."
+  bash "$ROOT/scripts/build_pqc_kat.sh" fault >/dev/null 2>&1
+  "$ROOT/build/harness/pqc_kat_fault" 5 > "$TMP/pqckat.txt" 2>&1 || true
+  cat "$TMP/pqckat.txt" >&2
+  if grep -q "oracle=O1_kat_bytes" "$TMP/pqckat.txt"; then
+    echo "PASS  PQC KAT detects liboqs<->PQClean byte divergence (O1_kat_bytes)"; pass=$((pass+1))
+  else
+    echo "FAIL  PQC KAT (expected O1_kat_bytes)"; fail=$((fail+1))
+  fi
+  # Restore the clean (non-fault) binary so later stages / campaigns use it.
+  bash "$ROOT/scripts/build_pqc_kat.sh" >/dev/null 2>&1 || true
+else
+  echo "SKIP  PQC KAT self-test (PQClean not built; run scripts/build_pqclean.sh)"
+fi
+
 # Stage 2.4 cross-language differential self-test (Go crypto vs OpenSSL; only if
 # Go is available).
 if command -v go >/dev/null 2>&1; then
@@ -345,6 +363,15 @@ if [ -n "$SEAL_A" ] && [ -f "$OFHE_A" ]; then
     echo "PASS  CKKS error-bound oracle detects out-of-bound result (O2_ckks_error_bound)"; pass=$((pass+1))
   else
     echo "FAIL  CKKS error-bound oracle (expected O2_ckks_error_bound)"; fail=$((fail+1))
+  fi
+  if [ -x "$ROOT/build/harness/fhe_ckks_diff_fault" ]; then
+    "$ROOT/build/harness/fhe_ckks_diff_fault" 20 12345 > "$TMP/fheckksdiff.txt" 2>&1 || true
+    cat "$TMP/fheckksdiff.txt" >&2
+    if grep -q "oracle=O1_ckks_interop" "$TMP/fheckksdiff.txt"; then
+      echo "PASS  CKKS cross-library differential detects OpenFHE<->SEAL divergence (O1_ckks_interop)"; pass=$((pass+1))
+    else
+      echo "FAIL  CKKS cross-library differential (expected O1_ckks_interop)"; fail=$((fail+1))
+    fi
   fi
   # Rebuild clean (non-fault) FHE binaries so later steps don't reuse fault ones.
   bash "$ROOT/scripts/build_fhe_diff.sh" >/dev/null 2>&1 || true

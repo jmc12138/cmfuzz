@@ -98,7 +98,10 @@ RUN bash scripts/build_liboqs.sh \
 
 # Stage 2.3 PQC cross-library differential: PQClean is a lightweight header/C
 # reference build, so we include it (and its self-test runs in negative_tests).
-RUN bash scripts/build_pqc_diff.sh
+# The deterministic NIST-KAT byte-exact cross-check reuses the same liboqs +
+# PQClean builds (no extra heavy deps), so build it here too.
+RUN bash scripts/build_pqc_diff.sh \
+    && bash scripts/build_pqc_kat.sh
 
 # Stage 2.4 cross-language differentials: Go crypto + RustCrypto backends. Both
 # toolchains are in the image, so build both (their self-tests run in
