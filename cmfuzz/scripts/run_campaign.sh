@@ -12,12 +12,26 @@ echo -e "target\truns\tcov\tfeatures\tcrashes\tstatus" > "$SUMMARY"
 for bin in "$BIN"/*; do
   [ -x "$bin" ] || continue
   name="$(basename "$bin")"
+  # Only genuine libFuzzer targets belong in a coverage-guided campaign. The
+  # stage-2.1 stdin CLIs (compute_*, diff_subproc) and helper drivers (cmf_*,
+  # fhe_diff) are NOT libFuzzer binaries; running them here wastes the budget and
+  # pollutes the summary with bogus rows. Probe each binary and skip non-fuzzers.
+  if ! timeout 5 "$bin" -help=1 </dev/null 2>&1 | grep -qi libFuzzer; then
+    echo "[campaign] skip $name (not a libFuzzer target)"
+    continue
+  fi
   cdir="$ROOT/results/corpus/$name"; mkdir -p "$cdir"
   crashdir="$RES/crashes_$name"; mkdir -p "$crashdir"
   log="$RES/log_$name.txt"
   echo "[campaign] $name for ${SECS}s"
   # FHE (SEAL) target isn't coverage-instrumented: run as property tester w/ seeds
   extra=""; case "$name" in fhe_*) extra="-max_len=64"; head -c 48 /dev/urandom > "$cdir/seed";; esac
+  # Auto-wire a per-target dictionary and seed corpus when the project ships one,
+  # so structured-input targets get useful starting inputs / tokens for free.
+  [ -f "$ROOT/harness/dicts/$name.dict" ] && extra="$extra -dict=$ROOT/harness/dicts/$name.dict"
+  if [ -d "$ROOT/harness/seeds/$name" ]; then
+    cp -n "$ROOT/harness/seeds/$name"/* "$cdir"/ 2>/dev/null || true
+  fi
   timeout "$SECS" "$bin" -artifact_prefix="$crashdir/" $extra "$cdir" > "$log" 2>&1
   rc=$?
   runs=$(grep -oE "#[0-9]+" "$log" | tail -1 | tr -d '#'); runs=${runs:-0}
