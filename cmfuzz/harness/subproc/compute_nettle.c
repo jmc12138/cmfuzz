@@ -16,8 +16,10 @@
  *
  * CMF_DIFF_FAULT=1 flips the first output byte for the negative self-test.
  */
+#include <nettle/sha1.h>
 #include <nettle/sha2.h>
 #include <nettle/sha3.h>
+#include <nettle/md5.h>
 #include <nettle/hmac.h>
 #include <nettle/chacha-poly1305.h>
 #include <nettle/gcm.h>
@@ -57,6 +59,38 @@ static int shake256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     sha3_256_update(&c, v->msglen, v->msg);
     sha3_256_shake(&c, 64, out);
     *n = 64; return 0;
+}
+/* Extra digests (blind-spot A). nettle exposes SHA-224/384/512-256 via the
+ * SHA-256/512 context types (see sha2.h), plus standalone SHA-1 and MD5. */
+static int nsha1(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct sha1_ctx c; sha1_init(&c);
+    sha1_update(&c, v->msglen, v->msg);
+    sha1_digest(&c, SHA1_DIGEST_SIZE, out);
+    *n = SHA1_DIGEST_SIZE; return 0;
+}
+static int nsha224(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct sha256_ctx c; sha224_init(&c);
+    sha224_update(&c, v->msglen, v->msg);
+    sha224_digest(&c, SHA224_DIGEST_SIZE, out);
+    *n = SHA224_DIGEST_SIZE; return 0;
+}
+static int nsha384(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct sha512_ctx c; sha384_init(&c);
+    sha384_update(&c, v->msglen, v->msg);
+    sha384_digest(&c, SHA384_DIGEST_SIZE, out);
+    *n = SHA384_DIGEST_SIZE; return 0;
+}
+static int nsha512_256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct sha512_256_ctx c; sha512_256_init(&c);
+    sha512_256_update(&c, v->msglen, v->msg);
+    sha512_256_digest(&c, SHA512_256_DIGEST_SIZE, out);
+    *n = SHA512_256_DIGEST_SIZE; return 0;
+}
+static int nmd5(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct md5_ctx c; md5_init(&c);
+    md5_update(&c, v->msglen, v->msg);
+    md5_digest(&c, MD5_DIGEST_SIZE, out);
+    *n = MD5_DIGEST_SIZE; return 0;
 }
 static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     struct hmac_sha256_ctx c;
@@ -135,6 +169,11 @@ int main(void) {
                 case 10: rc = pbkdf2_(&v, out, &n); break;
                 case 11: rc = ed25519_(&v, out, &n); break;
                 case 12: rc = x25519_(&v, out, &n); break;
+                case 15: rc = nsha1(&v, out, &n); break;
+                case 16: rc = nsha224(&v, out, &n); break;
+                case 17: rc = nsha384(&v, out, &n); break;
+                case 18: rc = nsha512_256(&v, out, &n); break;
+                case 19: rc = nmd5(&v, out, &n); break;
                 default: na = 1; break;   /* 7 (SHAKE128), 13/14: NA */
             }
             free(v.blob);

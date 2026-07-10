@@ -88,6 +88,12 @@ int main(void) {
                 case 7:  rc = shake(GCRY_MD_SHAKE128, 32, &v, out, &n); break;
                 case 8:  rc = shake(GCRY_MD_SHAKE256, 64, &v, out, &n); break;
                 case 10: rc = pbkdf2(&v, out, &n); break;
+                /* Extra digest coverage (blind-spot A). */
+                case 15: rc = hash_buf(GCRY_MD_SHA1, &v, out, &n); break;
+                case 16: rc = hash_buf(GCRY_MD_SHA224, &v, out, &n); break;
+                case 17: rc = hash_buf(GCRY_MD_SHA384, &v, out, &n); break;
+                case 18: rc = hash_buf(GCRY_MD_SHA512_256, &v, out, &n); break;
+                case 19: rc = hash_buf(GCRY_MD_MD5, &v, out, &n); break;
                 default: na = 1; break;   /* 9 (HKDF), 11-14 (public-key): NA */
             }
             free(v.blob);

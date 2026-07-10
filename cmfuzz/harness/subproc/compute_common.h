@@ -36,6 +36,8 @@
  *                               of the verify-payload is the raw modulus n; the
  *                               public exponent is fixed at 65537. Same 1-byte
  *                               accept/reject verdict comparison as op13.)
+ *             15 SHA-1  16 SHA-224  17 SHA-384  18 SHA-512/256  19 MD5
+ *                               (extra digest coverage; ignore key/nonce/aad)
  *
  * Verify-payload (ops >= 13, packed inside the msg region):
  *     pubkeylen(2, BE) || pubkey || siglen(2, BE) || sig || message

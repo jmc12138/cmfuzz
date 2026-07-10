@@ -242,11 +242,19 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
         case 10: return ref_pbkdf2(v, o, n);
         case 11: return ref_ed25519(v, o, n);
         case 12: return ref_x25519(v, o, n);
+        /* Extra digest coverage (blind-spot A): more of the SHA-2 family plus
+         * the legacy SHA-1/MD5 that real deployments still emit. */
+        case 15: return ref_digest(EVP_sha1(), v, o, n);
+        case 16: return ref_digest(EVP_sha224(), v, o, n);
+        case 17: return ref_digest(EVP_sha384(), v, o, n);
+        case 18: return ref_digest(EVP_sha512_256(), v, o, n);
+        case 19: return ref_digest(EVP_md5(), v, o, n);
     }
     return -1;
 }
 
-#define CMF_NUM_OPS 15   /* ops 0..14 (see compute_common.h) */
+/* ops 0..19 excluding the verify ops' special handling (see compute_common.h) */
+#define CMF_NUM_OPS 20
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
