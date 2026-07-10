@@ -523,12 +523,24 @@ int main(int argc, char **argv) {
         if (nv <= 1) continue;   /* only the reference present: nothing to check */
 
         if (ops[i] == 13 || ops[i] == 14) {
-            for (int j = 1; j < nv; j++)
-                if (strcmp(vv[j], vv[0]) != 0) {
+            /* Verify ops carry a boolean accept/reject verdict. A backend that
+             * raises an error on a malformed/invalid signature ("ERR") and the
+             * reference's clean reject ("00") both mean "not accepted", so a
+             * strict string compare would flag that benign signalling
+             * difference (e.g. BouncyCastle throwing on a bit-flipped DER
+             * signature that OpenSSL just rejects). Normalize ERR->reject and
+             * compare only the accept bit: the real bugs -- failing to verify a
+             * VALID signature, or ACCEPTING one the signer rejects (forgery) --
+             * still surface. */
+            int ref_acc = (strcmp(vv[0], "01") == 0);
+            for (int j = 1; j < nv; j++) {
+                int acc = (strcmp(vv[j], "01") == 0);
+                if (acc != ref_acc) {
                     fprintf(stderr, "CMF_VIOLATION alg=DIFF-subproc oracle=VERIFY_mismatch detail=\"openssl(authority) vs %s disagree at vec #%ld op=%d\"\n", vn[j], i, ops[i]);
                     fprintf(stderr, "  openssl=%s  %s=%s\n", vv[0], vn[j], vv[j]);
                     bdiv[vb[j]]++; failures++;
                 }
+            }
             continue;
         }
 
