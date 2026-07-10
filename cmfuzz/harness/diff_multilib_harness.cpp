@@ -6,7 +6,12 @@
  * disagreement is a differential bug (one library is wrong, or specs differ).
  *
  * Primitives: SHA-256, SHA-512, HMAC-SHA256, ChaCha20-Poly1305 (IETF),
- *             AES-256-GCM.
+ *             AES-256-GCM, SHA-1, SHA3-256, SHA3-512, HMAC-SHA512,
+ *             HKDF-SHA256 (RFC 5869).
+ *
+ * Not every library ships every primitive (e.g. libsodium has no SHA-1/SHA3/
+ * HKDF, and Mbed-TLS 2.x has no SHA3); each test only cross-checks the
+ * libraries that implement it, but always >= 2 so the oracle is meaningful.
  *
  * Build: see scripts/build_harness.sh (target DIFF).
  */
@@ -21,20 +26,27 @@
 /* ---- OpenSSL ---- */
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/kdf.h>
+#include <openssl/core_names.h>
+#include <openssl/params.h>
 
 /* ---- libsodium ---- */
 #include <sodium.h>
 
 /* ---- Mbed-TLS ---- */
+#include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/md.h>
 #include <mbedtls/gcm.h>
 #include <mbedtls/chachapoly.h>
+#include <mbedtls/hkdf.h>
 
 /* ---- Crypto++ ---- */
 #include <cryptopp/sha.h>
+#include <cryptopp/sha3.h>
 #include <cryptopp/hmac.h>
+#include <cryptopp/hkdf.h>
 #include <cryptopp/gcm.h>
 #include <cryptopp/aes.h>
 #include <cryptopp/chachapoly.h>
@@ -110,6 +122,55 @@ static void test_sha512(const uint8_t *m, size_t n) {
     agree("SHA-512", rs);
 }
 
+/* SHA-1 (OpenSSL, Mbed-TLS, Crypto++ — libsodium has no SHA-1). */
+static void test_sha1(const uint8_t *m, size_t n) {
+    std::vector<std::pair<const char*, bytes>> rs;
+
+    bytes o(20); unsigned int ol = 20;
+    EVP_Digest(m, n, o.data(), &ol, EVP_sha1(), nullptr);
+    rs.push_back({"openssl", o});
+
+    bytes mb(20);
+    mbedtls_sha1(m, n, mb.data());
+    rs.push_back({"mbedtls", mb});
+
+    bytes cp(20);
+    CryptoPP::SHA1().CalculateDigest(cp.data(), m, n);
+    rs.push_back({"cryptopp", cp});
+
+    agree("SHA-1", rs);
+}
+
+/* SHA3-256 (OpenSSL, Crypto++ — Mbed-TLS 2.x and libsodium have no SHA3). */
+static void test_sha3_256(const uint8_t *m, size_t n) {
+    std::vector<std::pair<const char*, bytes>> rs;
+
+    bytes o(32); unsigned int ol = 32;
+    EVP_Digest(m, n, o.data(), &ol, EVP_sha3_256(), nullptr);
+    rs.push_back({"openssl", o});
+
+    bytes cp(32);
+    CryptoPP::SHA3_256().CalculateDigest(cp.data(), m, n);
+    rs.push_back({"cryptopp", cp});
+
+    agree("SHA3-256", rs);
+}
+
+/* SHA3-512 (OpenSSL, Crypto++). */
+static void test_sha3_512(const uint8_t *m, size_t n) {
+    std::vector<std::pair<const char*, bytes>> rs;
+
+    bytes o(64); unsigned int ol = 64;
+    EVP_Digest(m, n, o.data(), &ol, EVP_sha3_512(), nullptr);
+    rs.push_back({"openssl", o});
+
+    bytes cp(64);
+    CryptoPP::SHA3_512().CalculateDigest(cp.data(), m, n);
+    rs.push_back({"cryptopp", cp});
+
+    agree("SHA3-512", rs);
+}
+
 /* ============================ HMAC-SHA256 ======================== */
 static void test_hmac256(const uint8_t key[32], const uint8_t *m, size_t n) {
     std::vector<std::pair<const char*, bytes>> rs;
@@ -136,6 +197,75 @@ static void test_hmac256(const uint8_t key[32], const uint8_t *m, size_t n) {
     rs.push_back({"cryptopp", cp});
 
     agree("HMAC-SHA256", rs);
+}
+
+/* ============================ HMAC-SHA512 ======================== */
+static void test_hmac512(const uint8_t key[32], const uint8_t *m, size_t n) {
+    std::vector<std::pair<const char*, bytes>> rs;
+
+    bytes o(64); unsigned int ol = 64;
+    HMAC(EVP_sha512(), key, 32, m, n, o.data(), &ol);
+    rs.push_back({"openssl", o});
+
+    bytes s(64);
+    crypto_auth_hmacsha512(s.data(), m, n, key);   /* key fixed 32B */
+    rs.push_back({"libsodium", s});
+
+    bytes mb(64);
+    mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA512),
+                    key, 32, m, n, mb.data());
+    rs.push_back({"mbedtls", mb});
+
+    bytes cp(64);
+    {
+        CryptoPP::HMAC<CryptoPP::SHA512> h(key, 32);
+        h.CalculateDigest(cp.data(), m, n);
+    }
+    rs.push_back({"cryptopp", cp});
+
+    agree("HMAC-SHA512", rs);
+}
+
+/* ==================== HKDF-SHA256 (RFC 5869) ===================== */
+/* IKM = message, salt = first 16 key bytes, info = "cmfuzz", 42-byte output. */
+static void test_hkdf256(const uint8_t key[32], const uint8_t *m, size_t n) {
+    const uint8_t *ikm = m; size_t ikmlen = n;
+    const uint8_t *salt = key; const size_t saltlen = 16;
+    static const uint8_t info[6] = {'c','m','f','u','z','z'};
+    const size_t L = 42;
+    std::vector<std::pair<const char*, bytes>> rs;
+
+    /* OpenSSL 3.0 EVP_KDF */
+    {
+        bytes out(L);
+        char dg[] = "SHA256";
+        EVP_KDF *kdf = EVP_KDF_fetch(nullptr, "HKDF", nullptr);
+        EVP_KDF_CTX *kctx = EVP_KDF_CTX_new(kdf);
+        OSSL_PARAM params[5];
+        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, dg, 0);
+        params[1] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, (void*)ikm, ikmlen);
+        params[2] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, (void*)salt, saltlen);
+        params[3] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, (void*)info, sizeof info);
+        params[4] = OSSL_PARAM_construct_end();
+        EVP_KDF_derive(kctx, out.data(), L, params);
+        EVP_KDF_CTX_free(kctx); EVP_KDF_free(kdf);
+        rs.push_back({"openssl", out});
+    }
+    /* Mbed-TLS */
+    {
+        bytes out(L);
+        mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
+                     salt, saltlen, ikm, ikmlen, info, sizeof info, out.data(), L);
+        rs.push_back({"mbedtls", out});
+    }
+    /* Crypto++ */
+    {
+        bytes out(L);
+        CryptoPP::HKDF<CryptoPP::SHA256> hkdf;
+        hkdf.DeriveKey(out.data(), L, ikm, ikmlen, salt, saltlen, info, sizeof info);
+        rs.push_back({"cryptopp", out});
+    }
+    agree("HKDF-SHA256", rs);
 }
 
 /* ==================== ChaCha20-Poly1305 (IETF) =================== */
@@ -256,7 +386,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     cmf_prng_seed(data, size);
 
     cmf_reader_t r; cmf_reader_init(&r, data, size);
-    uint8_t op = cmf_u8(&r) % 5;
+    uint8_t op = cmf_u8(&r) % 10;
     uint8_t split = cmf_u8(&r);
 
     /* derive fixed key/nonce material deterministically */
@@ -279,6 +409,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         case 2: test_hmac256(key, p, rem); break;
         case 3: test_chachapoly(key, nonce, msg, mlen, aad, adn); break;
         case 4: test_aesgcm(key, nonce, msg, mlen, aad, adn); break;
+        case 5: test_sha1(p, rem); break;
+        case 6: test_sha3_256(p, rem); break;
+        case 7: test_sha3_512(p, rem); break;
+        case 8: test_hmac512(key, p, rem); break;
+        case 9: test_hkdf256(key, p, rem); break;
     }
     return 0;
 }
