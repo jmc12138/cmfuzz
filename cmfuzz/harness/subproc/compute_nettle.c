@@ -99,6 +99,29 @@ static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     hmac_sha256_digest(&c, SHA256_DIGEST_SIZE, out);
     *n = SHA256_DIGEST_SIZE; return 0;
 }
+/* Extra HMAC coverage (blind-spot A). nettle's SHA-384 HMAC reuses the
+ * SHA-512 context type (see hmac.h). */
+static int hmac1(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct hmac_sha1_ctx c;
+    hmac_sha1_set_key(&c, CMF_KEYLEN, v->key);
+    hmac_sha1_update(&c, v->msglen, v->msg);
+    hmac_sha1_digest(&c, SHA1_DIGEST_SIZE, out);
+    *n = SHA1_DIGEST_SIZE; return 0;
+}
+static int hmac384(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct hmac_sha512_ctx c;
+    hmac_sha384_set_key(&c, CMF_KEYLEN, v->key);
+    hmac_sha384_update(&c, v->msglen, v->msg);
+    hmac_sha384_digest(&c, SHA384_DIGEST_SIZE, out);
+    *n = SHA384_DIGEST_SIZE; return 0;
+}
+static int hmac512(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct hmac_sha512_ctx c;
+    hmac_sha512_set_key(&c, CMF_KEYLEN, v->key);
+    hmac_sha512_update(&c, v->msglen, v->msg);
+    hmac_sha512_digest(&c, SHA512_DIGEST_SIZE, out);
+    *n = SHA512_DIGEST_SIZE; return 0;
+}
 static int chachapoly(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     struct chacha_poly1305_ctx c;
     chacha_poly1305_set_key(&c, v->key);
@@ -174,6 +197,9 @@ int main(void) {
                 case 17: rc = nsha384(&v, out, &n); break;
                 case 18: rc = nsha512_256(&v, out, &n); break;
                 case 19: rc = nmd5(&v, out, &n); break;
+                case 20: rc = hmac1(&v, out, &n); break;
+                case 21: rc = hmac384(&v, out, &n); break;
+                case 22: rc = hmac512(&v, out, &n); break;
                 default: na = 1; break;   /* 7 (SHAKE128), 13/14: NA */
             }
             free(v.blob);

@@ -34,15 +34,18 @@ static int shake(int algo, size_t outlen, const cmf_vec_t *v, uint8_t *out, size
     *n = outlen; return 0;
 }
 
-static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+static int hmac_algo(int algo, const cmf_vec_t *v, uint8_t *out, size_t *n) {
     gcry_mac_hd_t h;
-    if (gcry_mac_open(&h, GCRY_MAC_HMAC_SHA256, 0, NULL)) return -1;
-    size_t ol = 32; int rc = -1;
+    if (gcry_mac_open(&h, algo, 0, NULL)) return -1;
+    size_t ol = 64; int rc = -1;   /* fits the largest MAC we emit (SHA-512) */
     if (!gcry_mac_setkey(h, v->key, CMF_KEYLEN) &&
         !gcry_mac_write(h, v->msg, v->msglen) &&
         !gcry_mac_read(h, out, &ol)) { *n = ol; rc = 0; }
     gcry_mac_close(h);
     return rc;
+}
+static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    return hmac_algo(GCRY_MAC_HMAC_SHA256, v, out, n);
 }
 
 static int aead(int cipher, int mode, const cmf_vec_t *v, uint8_t *out, size_t *n) {
@@ -94,6 +97,10 @@ int main(void) {
                 case 17: rc = hash_buf(GCRY_MD_SHA384, &v, out, &n); break;
                 case 18: rc = hash_buf(GCRY_MD_SHA512_256, &v, out, &n); break;
                 case 19: rc = hash_buf(GCRY_MD_MD5, &v, out, &n); break;
+                /* Extra HMAC coverage (blind-spot A). */
+                case 20: rc = hmac_algo(GCRY_MAC_HMAC_SHA1, &v, out, &n); break;
+                case 21: rc = hmac_algo(GCRY_MAC_HMAC_SHA384, &v, out, &n); break;
+                case 22: rc = hmac_algo(GCRY_MAC_HMAC_SHA512, &v, out, &n); break;
                 default: na = 1; break;   /* 9 (HKDF), 11-14 (public-key): NA */
             }
             free(v.blob);

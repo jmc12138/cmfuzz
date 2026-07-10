@@ -38,6 +38,8 @@
  *                               accept/reject verdict comparison as op13.)
  *             15 SHA-1  16 SHA-224  17 SHA-384  18 SHA-512/256  19 MD5
  *                               (extra digest coverage; ignore key/nonce/aad)
+ *             20 HMAC-SHA1  21 HMAC-SHA384  22 HMAC-SHA512
+ *                               (extra HMAC coverage; key=key, message=msg)
  *
  * Verify-payload (ops >= 13, packed inside the msg region):
  *     pubkeylen(2, BE) || pubkey || siglen(2, BE) || sig || message

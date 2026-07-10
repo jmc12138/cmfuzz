@@ -60,10 +60,13 @@ static int ref_xof(const EVP_MD *md, const cmf_vec_t *v, uint8_t *o, size_t outl
     if (!ok) return -1;
     *n = outlen; return 0;
 }
-static int ref_hmac(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+static int ref_hmac_md(const EVP_MD *md, const cmf_vec_t *v, uint8_t *o, size_t *n) {
     unsigned int ol = 0;
-    if (!HMAC(EVP_sha256(), v->key, CMF_KEYLEN, v->msg, v->msglen, o, &ol)) return -1;
+    if (!HMAC(md, v->key, CMF_KEYLEN, v->msg, v->msglen, o, &ol)) return -1;
     *n = ol; return 0;
+}
+static int ref_hmac(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    return ref_hmac_md(EVP_sha256(), v, o, n);
 }
 static int ref_aead(const EVP_CIPHER *ci, const cmf_vec_t *v, uint8_t *o, size_t *n) {
     int len = 0, cl = 0;
@@ -249,12 +252,16 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
         case 17: return ref_digest(EVP_sha384(), v, o, n);
         case 18: return ref_digest(EVP_sha512_256(), v, o, n);
         case 19: return ref_digest(EVP_md5(), v, o, n);
+        /* Extra HMAC coverage (blind-spot A). */
+        case 20: return ref_hmac_md(EVP_sha1(), v, o, n);
+        case 21: return ref_hmac_md(EVP_sha384(), v, o, n);
+        case 22: return ref_hmac_md(EVP_sha512(), v, o, n);
     }
     return -1;
 }
 
-/* ops 0..19 excluding the verify ops' special handling (see compute_common.h) */
-#define CMF_NUM_OPS 20
+/* ops 0..22 excluding the verify ops' special handling (see compute_common.h) */
+#define CMF_NUM_OPS 23
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
