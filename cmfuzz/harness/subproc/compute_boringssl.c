@@ -133,6 +133,7 @@ int main(void) {
                 case 12: rc = x25519(&v, out, &n); break;
                 case 13: rc = ecdsa_verify(&v, out, &n); break;
                 case 14: rc = rsa_pss_verify(&v, out, &n); break;
+                default: rc = -2; break;   /* ops 15+ not implemented here: abstain (NA) */
             }
             free(v.blob);
         }

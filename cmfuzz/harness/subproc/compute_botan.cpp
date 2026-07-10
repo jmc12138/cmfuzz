@@ -153,10 +153,12 @@ int main(void) {
                     case 12: rc = x25519(&v, out, &n); break;
                     case 13: rc = ecdsa_verify(&v, out, &n); break;
                     case 14: rc = rsa_pss_verify(&v, out, &n); break;
+                    default: rc = -2; break;   /* ops 15+ not implemented here: abstain (NA) */
                 }
             } catch (...) { rc = -1; }
             free(v.blob);
         }
+        if (rc == -2) { printf("NA\n"); fflush(stdout); continue; }
         if (rc != 0) { printf("ERR\n"); fflush(stdout); continue; }
 #ifdef CMF_DIFF_FAULT
         if (n) out[0] ^= 0xFF;   /* self-test: force a divergence */
