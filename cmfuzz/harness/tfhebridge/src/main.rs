@@ -5,11 +5,17 @@
 // stage 2.5. Unlike CKKS, TFHE integer arithmetic is EXACT, so the metamorphic
 // oracle is an equality check (like the BFV differential), not an error bound:
 //
-//   for random u32 a,b:
+//   for random u32 a,b,c:
 //     add : Dec(Enc(a) + Enc(b)) == a.wrapping_add(b)
 //     sub : Dec(Enc(a) - Enc(b)) == a.wrapping_sub(b)
 //     mul : Dec(Enc(a) * Enc(b)) == a.wrapping_mul(b)
 //     MR (distributivity): Dec(Enc(a) * (Enc(b)+Enc(c))) == a*(b+c)   (all wrapping)
+//     bitwise : Dec(Enc(a) & Enc(b)) == a&b   (and |, ^)
+//     compare : Dec(Enc(a) > Enc(b)) == (a>b)   (and <, ==, !=)
+//
+// Encrypted comparison is TFHE/CGGI's distinguishing capability (BFV/CKKS cannot
+// evaluate it natively), so covering it closes the FHE blind-spot's noted gap of
+// having no comparison/bitwise oracle for the TFHE lineage.
 //
 // Any mismatch prints a CMF_VIOLATION line and exits non-zero, so it doubles as a
 // self-test under `--features fault` (which corrupts one homomorphic result).
@@ -67,6 +73,15 @@ fn main() {
         let mut r_mul: u32 = (&ea * &eb).decrypt(&ck);
         let r_dis: u32 = (&ea * (&eb + &ec)).decrypt(&ck);
 
+        let r_and: u32 = (&ea & &eb).decrypt(&ck);
+        let r_or: u32 = (&ea | &eb).decrypt(&ck);
+        let r_xor: u32 = (&ea ^ &eb).decrypt(&ck);
+
+        let r_gt: bool = ea.gt(&eb).decrypt(&ck);
+        let r_lt: bool = ea.lt(&eb).decrypt(&ck);
+        let r_eq: bool = ea.eq(&eb).decrypt(&ck);
+        let r_ne: bool = ea.ne(&eb).decrypt(&ck);
+
         #[cfg(feature = "fault")]
         {
             r_mul = r_mul.wrapping_add(1); // corrupt one result beyond the exact oracle
@@ -88,11 +103,39 @@ fn main() {
             violation(&format!("distributivity mismatch a={a} b={b} c={c} got={r_dis}"));
             failures += 1;
         }
+        if r_and != (a & b) {
+            violation(&format!("and mismatch a={a} b={b} got={r_and}"));
+            failures += 1;
+        }
+        if r_or != (a | b) {
+            violation(&format!("or mismatch a={a} b={b} got={r_or}"));
+            failures += 1;
+        }
+        if r_xor != (a ^ b) {
+            violation(&format!("xor mismatch a={a} b={b} got={r_xor}"));
+            failures += 1;
+        }
+        if r_gt != (a > b) {
+            violation(&format!("gt mismatch a={a} b={b} got={r_gt}"));
+            failures += 1;
+        }
+        if r_lt != (a < b) {
+            violation(&format!("lt mismatch a={a} b={b} got={r_lt}"));
+            failures += 1;
+        }
+        if r_eq != (a == b) {
+            violation(&format!("eq mismatch a={a} b={b} got={r_eq}"));
+            failures += 1;
+        }
+        if r_ne != (a != b) {
+            violation(&format!("ne mismatch a={a} b={b} got={r_ne}"));
+            failures += 1;
+        }
     }
 
     if failures > 0 {
         eprintln!("[tfhe] {failures} oracle violation(s) over {iters} iterations");
         std::process::exit(1);
     }
-    eprintln!("[tfhe] {iters} iterations: homomorphic integer arithmetic correct");
+    eprintln!("[tfhe] {iters} iterations: homomorphic integer arithmetic/bitwise/comparison correct");
 }
