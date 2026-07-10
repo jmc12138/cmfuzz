@@ -18,6 +18,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/kdf.h>
@@ -323,10 +326,26 @@ int main(int argc, char **argv) {
         *eq = '\0';
         const char *name = argv[a], *path = eq + 1;
 
-        char cmd[1024];
-        snprintf(cmd, sizeof cmd, "'%s' < '%s'", path, reqpath);
-        FILE *p = popen(cmd, "r");
-        if (!p) { fprintf(stderr, "popen failed for %s\n", name); return 2; }
+        /* Spawn the backend CLI via fork/exec instead of popen(): no shell is
+         * involved, so a backend path containing quotes/spaces/metachars can
+         * never break or be reinterpreted. Child reads the request file on
+         * stdin and writes results on the pipe. */
+        int fin = open(reqpath, O_RDONLY);
+        if (fin < 0) { fprintf(stderr, "open req failed for %s\n", name); return 2; }
+        int fd[2];
+        if (pipe(fd) != 0) { fprintf(stderr, "pipe failed for %s\n", name); close(fin); return 2; }
+        pid_t pid = fork();
+        if (pid < 0) { fprintf(stderr, "fork failed for %s\n", name); close(fin); close(fd[0]); close(fd[1]); return 2; }
+        if (pid == 0) {
+            dup2(fin, STDIN_FILENO);
+            dup2(fd[1], STDOUT_FILENO);
+            close(fin); close(fd[0]); close(fd[1]);
+            execl(path, path, (char *)NULL);
+            _exit(127);
+        }
+        close(fin); close(fd[1]);
+        FILE *p = fdopen(fd[0], "r");
+        if (!p) { fprintf(stderr, "fdopen failed for %s\n", name); close(fd[0]); waitpid(pid, NULL, 0); return 2; }
 
         char *line = NULL; size_t cap = 0; long i = 0; int mism = 0;
         while (i < N && getline(&line, &cap, p) > 0) {
@@ -344,7 +363,8 @@ int main(int argc, char **argv) {
             }
             i++;
         }
-        pclose(p);
+        fclose(p);
+        waitpid(pid, NULL, 0);
         free(line);
         if (!mism && i < N)
             { fprintf(stderr, "backend %s produced only %ld/%ld outputs\n", name, i, N); failures++; }
