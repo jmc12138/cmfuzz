@@ -99,6 +99,33 @@ static int ref_hkdf(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     if (ok <= 0) return -1;
     *n = CMF_HKDF_OUTLEN; return 0;
 }
+/* Generic EVP_MAC helper for the extra MAC ops (blind-spot A): Poly1305 (raw
+ * one-time 32-byte key, 16-byte tag) and CMAC-AES-256. */
+static int ref_mac(const char *macname, const char *cipher,
+                   const cmf_vec_t *v, size_t keylen, size_t outlen,
+                   uint8_t *o, size_t *n) {
+    EVP_MAC *m = EVP_MAC_fetch(NULL, macname, NULL);
+    if (!m) return -1;
+    EVP_MAC_CTX *c = EVP_MAC_CTX_new(m);
+    EVP_MAC_free(m);
+    if (!c) return -1;
+    OSSL_PARAM p[2]; int i = 0;
+    if (cipher) p[i++] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_CIPHER, (char *)cipher, 0);
+    p[i] = OSSL_PARAM_construct_end();
+    size_t ol = 0;
+    int ok = EVP_MAC_init(c, v->key, keylen, p) == 1 &&
+             EVP_MAC_update(c, v->msg, v->msglen) == 1 &&
+             EVP_MAC_final(c, o, &ol, outlen) == 1;
+    EVP_MAC_CTX_free(c);
+    if (!ok) return -1;
+    *n = ol; return 0;
+}
+static int ref_poly1305(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    return ref_mac("POLY1305", NULL, v, 32, CMF_TAGLEN, o, n);
+}
+static int ref_cmac_aes256(const cmf_vec_t *v, uint8_t *o, size_t *n) {
+    return ref_mac("CMAC", "AES-256-CBC", v, CMF_KEYLEN, CMF_TAGLEN, o, n);
+}
 static int ref_pbkdf2(const cmf_vec_t *v, uint8_t *o, size_t *n) {
     if (!PKCS5_PBKDF2_HMAC((const char *)v->msg, (int)v->msglen,
                            v->key, CMF_KEYLEN, CMF_PBKDF2_ITER,
@@ -256,12 +283,17 @@ static int ref_compute(const cmf_vec_t *v, uint8_t *o, size_t *n) {
         case 20: return ref_hmac_md(EVP_sha1(), v, o, n);
         case 21: return ref_hmac_md(EVP_sha384(), v, o, n);
         case 22: return ref_hmac_md(EVP_sha512(), v, o, n);
+        /* Extra AEAD / MAC coverage (blind-spot A). */
+        case 23: return ref_aead(EVP_aes_128_gcm(), v, o, n);
+        case 24: return ref_aead(EVP_aes_192_gcm(), v, o, n);
+        case 25: return ref_poly1305(v, o, n);
+        case 26: return ref_cmac_aes256(v, o, n);
     }
     return -1;
 }
 
-/* ops 0..22 excluding the verify ops' special handling (see compute_common.h) */
-#define CMF_NUM_OPS 23
+/* ops 0..26 excluding the verify ops' special handling (see compute_common.h) */
+#define CMF_NUM_OPS 27
 
 static const char *HEX = "0123456789abcdef";
 static void tohex(const uint8_t *b, size_t n, char *out) {
@@ -369,7 +401,7 @@ int main(int argc, char **argv) {
          * message to a block/limb edge instead of a random length. */
         if (op != 12 && (rnd() % 4) == 0) msglen = BOUNDARY_LEN[rnd() % BOUNDARY_LEN_N];
         if (op == 12) msglen = CMF_X25519_LEN;   /* X25519 peer public key */
-        size_t aadlen = (op == 3 || op == 4 || op == 9) ? (rnd() % 64) : 0;
+        size_t aadlen = (op == 3 || op == 4 || op == 9 || op == 23 || op == 24) ? (rnd() % 64) : 0;
         size_t need = CMF_KEYLEN + CMF_NONCELEN + 2 + aadlen + msglen;
         uint8_t *blob = malloc(need);
         rnd_bytes(blob, CMF_KEYLEN + CMF_NONCELEN);

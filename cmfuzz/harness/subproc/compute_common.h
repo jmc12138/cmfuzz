@@ -40,6 +40,9 @@
  *                               (extra digest coverage; ignore key/nonce/aad)
  *             20 HMAC-SHA1  21 HMAC-SHA384  22 HMAC-SHA512
  *                               (extra HMAC coverage; key=key, message=msg)
+ *             23 AES-128-GCM  24 AES-192-GCM  (key = first 16/24 bytes of key)
+ *             25 Poly1305     (raw one-time MAC, key=key[0..32], 16-byte tag)
+ *             26 CMAC-AES-256 (key=key, message=msg, 16-byte tag)
  *
  * Verify-payload (ops >= 13, packed inside the msg region):
  *     pubkeylen(2, BE) || pubkey || siglen(2, BE) || sig || message

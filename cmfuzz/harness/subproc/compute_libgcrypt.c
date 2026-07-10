@@ -48,11 +48,12 @@ static int hmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     return hmac_algo(GCRY_MAC_HMAC_SHA256, v, out, n);
 }
 
-static int aead(int cipher, int mode, const cmf_vec_t *v, uint8_t *out, size_t *n) {
+static int aead_kl(int cipher, int mode, size_t keylen,
+                   const cmf_vec_t *v, uint8_t *out, size_t *n) {
     gcry_cipher_hd_t h;
     if (gcry_cipher_open(&h, cipher, mode, 0)) return -1;
     int rc = -1;
-    if (!gcry_cipher_setkey(h, v->key, CMF_KEYLEN) &&
+    if (!gcry_cipher_setkey(h, v->key, keylen) &&
         !gcry_cipher_setiv(h, v->nonce, CMF_NONCELEN) &&
         (v->aadlen == 0 || !gcry_cipher_authenticate(h, v->aad, v->aadlen)) &&
         !gcry_cipher_encrypt(h, out, v->msglen, v->msg, v->msglen) &&
@@ -61,6 +62,9 @@ static int aead(int cipher, int mode, const cmf_vec_t *v, uint8_t *out, size_t *
     }
     gcry_cipher_close(h);
     return rc;
+}
+static int aead(int cipher, int mode, const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    return aead_kl(cipher, mode, CMF_KEYLEN, v, out, n);
 }
 
 static int pbkdf2(const cmf_vec_t *v, uint8_t *out, size_t *n) {
@@ -101,6 +105,12 @@ int main(void) {
                 case 20: rc = hmac_algo(GCRY_MAC_HMAC_SHA1, &v, out, &n); break;
                 case 21: rc = hmac_algo(GCRY_MAC_HMAC_SHA384, &v, out, &n); break;
                 case 22: rc = hmac_algo(GCRY_MAC_HMAC_SHA512, &v, out, &n); break;
+                /* Extra AEAD / MAC coverage (blind-spot A). Poly1305 (op25) uses
+                 * a 32-byte one-time key; CMAC with a 32-byte key is AES-256. */
+                case 23: rc = aead_kl(GCRY_CIPHER_AES128, GCRY_CIPHER_MODE_GCM, 16, &v, out, &n); break;
+                case 24: rc = aead_kl(GCRY_CIPHER_AES192, GCRY_CIPHER_MODE_GCM, 24, &v, out, &n); break;
+                case 25: rc = hmac_algo(GCRY_MAC_POLY1305, &v, out, &n); break;
+                case 26: rc = hmac_algo(GCRY_MAC_CMAC_AES, &v, out, &n); break;
                 default: na = 1; break;   /* 9 (HKDF), 11-14 (public-key): NA */
             }
             free(v.blob);

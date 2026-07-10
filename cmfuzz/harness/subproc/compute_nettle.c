@@ -24,6 +24,7 @@
 #include <nettle/chacha-poly1305.h>
 #include <nettle/gcm.h>
 #include <nettle/aes.h>
+#include <nettle/cmac.h>
 #include <nettle/pbkdf2.h>
 #include <nettle/hkdf.h>
 #include <nettle/eddsa.h>
@@ -140,6 +141,35 @@ static int aesgcm(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     gcm_aes256_digest(&c, CMF_TAGLEN, out + v->msglen);
     *n = v->msglen + CMF_TAGLEN; return 0;
 }
+/* Extra AEAD / MAC coverage (blind-spot A). AES-128/192-GCM read the first
+ * 16/24 bytes of the key field; CMAC-AES-256 uses the full 32-byte key. nettle
+ * exposes only Poly1305-AES (not the raw one-time Poly1305 MAC), so op 25 is
+ * left to the 'default: NA' arm. */
+static int aesgcm128(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct gcm_aes128_ctx c;
+    gcm_aes128_set_key(&c, v->key);
+    gcm_aes128_set_iv(&c, CMF_NONCELEN, v->nonce);
+    if (v->aadlen) gcm_aes128_update(&c, v->aadlen, v->aad);
+    gcm_aes128_encrypt(&c, v->msglen, out, v->msg);
+    gcm_aes128_digest(&c, CMF_TAGLEN, out + v->msglen);
+    *n = v->msglen + CMF_TAGLEN; return 0;
+}
+static int aesgcm192(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct gcm_aes192_ctx c;
+    gcm_aes192_set_key(&c, v->key);
+    gcm_aes192_set_iv(&c, CMF_NONCELEN, v->nonce);
+    if (v->aadlen) gcm_aes192_update(&c, v->aadlen, v->aad);
+    gcm_aes192_encrypt(&c, v->msglen, out, v->msg);
+    gcm_aes192_digest(&c, CMF_TAGLEN, out + v->msglen);
+    *n = v->msglen + CMF_TAGLEN; return 0;
+}
+static int cmac256(const cmf_vec_t *v, uint8_t *out, size_t *n) {
+    struct cmac_aes256_ctx c;
+    cmac_aes256_set_key(&c, v->key);
+    cmac_aes256_update(&c, v->msglen, v->msg);
+    cmac_aes256_digest(&c, CMF_TAGLEN, out);
+    *n = CMF_TAGLEN; return 0;
+}
 static int pbkdf2_(const cmf_vec_t *v, uint8_t *out, size_t *n) {
     pbkdf2_hmac_sha256(v->msglen, v->msg, CMF_PBKDF2_ITER,
                        CMF_KEYLEN, v->key, CMF_PBKDF2_DKLEN, out);
@@ -200,7 +230,10 @@ int main(void) {
                 case 20: rc = hmac1(&v, out, &n); break;
                 case 21: rc = hmac384(&v, out, &n); break;
                 case 22: rc = hmac512(&v, out, &n); break;
-                default: na = 1; break;   /* 7 (SHAKE128), 13/14: NA */
+                case 23: rc = aesgcm128(&v, out, &n); break;
+                case 24: rc = aesgcm192(&v, out, &n); break;
+                case 26: rc = cmac256(&v, out, &n); break;
+                default: na = 1; break;   /* 7 (SHAKE128), 13/14, 25 (Poly1305): NA */
             }
             free(v.blob);
         }
